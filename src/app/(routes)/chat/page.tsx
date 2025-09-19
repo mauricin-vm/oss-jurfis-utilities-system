@@ -45,7 +45,7 @@ export default function ChatPage() {
   const [chatPresenceStates, setChatPresenceStates] = useState<Record<string, string>>({});
   const [isLoadingMoreChats, setIsLoadingMoreChats] = useState(false);
   const [forceScrollToBottom, setForceScrollToBottom] = useState(false);
-  
+
   // Ref para rastrear estado anterior de conexão
   const previousConnectionStatus = useRef<string>('checking');
 
@@ -69,7 +69,17 @@ export default function ChatPage() {
   });
 
   // Estados para áudio
-  type AudioStates = { [key: string]: { isPlaying: boolean, progress: number, audio?: HTMLAudioElement } };
+  type AudioStates = {
+    [key: string]: {
+      isPlaying: boolean;
+      progress: number;
+      audio?: HTMLAudioElement;
+      playbackRate?: number;
+      currentTime?: number;
+      duration?: number;
+      hasStartedOnce?: boolean;
+    }
+  };
   const [audioStates, setAudioStates] = useState<AudioStates>({});
 
   // === AUTENTICAÇÃO ===
@@ -84,7 +94,7 @@ export default function ChatPage() {
   const loadChats = useCallback(async (page = 1, append = false, attempt = 1) => {
     const maxAttempts = 3;
     const retryDelays = [0, 3000, 6000]; // 0s, 3s, 6s
-    
+
     // Para carregamento inicial, só procede se status for 'connected'
     if (connectionState.status !== 'connected' && !append) {
       console.log('⚠️ Status não é "connected", cancelando carregamento de chats');
@@ -99,15 +109,15 @@ export default function ChatPage() {
       if (page > 1) setIsLoadingMoreChats(true);
 
       console.log(`📡 Carregando chats da API (tentativa ${attempt}/${maxAttempts})...`);
-      
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
-      
+
       const response = await fetch(`/api/chat/chats?page=${page}&limit=20`, {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
-      
+
       const data = await response.json();
 
       if (data.success) {
@@ -123,11 +133,11 @@ export default function ChatPage() {
         setCurrentPage(page);
       } else {
         console.error(`❌ API retornou erro (tentativa ${attempt}/${maxAttempts}):`, data.error);
-        
+
         // Se não foi sucesso, tentar novamente
         if (attempt < maxAttempts) {
           const delay = retryDelays[attempt];
-          console.log(`🔄 Tentando novamente em ${delay/1000}s... (${attempt + 1}/${maxAttempts})`);
+          console.log(`🔄 Tentando novamente em ${delay / 1000}s... (${attempt + 1}/${maxAttempts})`);
           setTimeout(() => {
             loadChats(page, append, attempt + 1);
           }, delay);
@@ -140,11 +150,11 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error(`❌ Erro ao carregar chats (tentativa ${attempt}/${maxAttempts}):`, error);
-      
+
       // Se houve erro de rede/timeout, tentar novamente
       if (attempt < maxAttempts) {
         const delay = retryDelays[attempt];
-        console.log(`🔄 Erro de rede - tentando novamente em ${delay/1000}s... (${attempt + 1}/${maxAttempts})`);
+        console.log(`🔄 Erro de rede - tentando novamente em ${delay / 1000}s... (${attempt + 1}/${maxAttempts})`);
         setTimeout(() => {
           loadChats(page, append, attempt + 1);
         }, delay);
@@ -162,12 +172,12 @@ export default function ChatPage() {
   // === FUNÇÃO PARA CARREGAR CHATS DIRETAMENTE (BYPASS STATUS) ===
   const loadChatsDirectly = useCallback(async (attempt = 1) => {
     const maxAttempts = 2;
-    
+
     try {
       console.log(`📡 Carregando chats diretamente da API (fallback, tentativa ${attempt}/${maxAttempts})...`);
       const response = await fetch(`/api/chat/chats?page=1&limit=20`);
       const data = await response.json();
-      
+
       if (data.success && data.chats) {
         setChats(data.chats);
         // IMPORTANTE: Só marca como carregado APÓS receber dados da API
@@ -177,7 +187,7 @@ export default function ChatPage() {
         console.log('✅ Chats carregados via fallback, saindo do loading');
       } else {
         console.error('❌ API fallback retornou erro:', data.error);
-        
+
         // Tentar novamente se não foi sucesso
         if (attempt < maxAttempts) {
           console.log(`🔄 Tentando novamente em 3s... (${attempt + 1}/${maxAttempts})`);
@@ -189,7 +199,7 @@ export default function ChatPage() {
       }
     } catch (error) {
       console.error(`❌ Erro ao carregar chats diretamente (tentativa ${attempt}):`, error);
-      
+
       // Tentar novamente se houve erro de rede
       if (attempt < maxAttempts) {
         console.log(`🔄 Tentando novamente em 3s... (${attempt + 1}/${maxAttempts})`);
@@ -208,17 +218,17 @@ export default function ChatPage() {
       const timeoutId = setTimeout(async () => {
         try {
           const response = await fetch('/api/chat/status');
-          
+
           if (response.ok) {
             const data = await response.json();
-            
+
             if (data.success && data.connected) {
               // API confirma conectado - carregar chats diretamente
               await loadChatsDirectly();
             } else {
               // API indica não conectado - marcar como carregado para mostrar QR
-              setLoadingState(prev => ({ 
-                ...prev, 
+              setLoadingState(prev => ({
+                ...prev,
                 areChatsLoaded: true
               }));
             }
@@ -226,8 +236,8 @@ export default function ChatPage() {
         } catch (error) {
           console.error('❌ Erro na verificação de status:', error);
           // Em caso de erro, sair do loading
-          setLoadingState(prev => ({ 
-            ...prev, 
+          setLoadingState(prev => ({
+            ...prev,
             areChatsLoaded: true
           }));
         }
@@ -251,7 +261,7 @@ export default function ChatPage() {
         ...prev,
         areChatsLoaded: false // Resetar para forçar carregamento
       }));
-      
+
       // Aguardar 2s para dar tempo do wppconnect-server sincronizar completamente
       setTimeout(() => {
         console.log('🚀 Iniciando carregamento de chats após sincronização...');
@@ -302,7 +312,6 @@ export default function ChatPage() {
 
       const response = await fetch(`/api/chat/messages/${encodeURIComponent(chatId)}?${params.toString()}`);
       const data = await response.json();
-
       if (data.success) {
         if (loadMore) {
           setMessages(prev => [...data.messages, ...prev]);
@@ -349,14 +358,20 @@ export default function ChatPage() {
   const handleChatSelect = async (chat: Chats) => {
     const updatedChat = chat.unreadCount > 0 ? { ...chat, unreadCount: 0 } : chat;
 
+    // IMPORTANTE: Iniciar loading imediatamente antes de qualquer operação
+    setLoadingState(prev => ({ ...prev, areInitialMessagesLoaded: false }));
     setMessagesState({
       lastMessageId: null,
       hasMoreMessages: true,
-      isLoadingMessages: false,
+      isLoadingMessages: true, // Iniciar loading imediatamente
       isLoadingOlderMessages: false
     });
 
-    setLoadingState(prev => ({ ...prev, areInitialMessagesLoaded: false }));
+    // Definir o chat selecionado imediatamente para mostrar o cabeçalho
+    setSelectedChat({ chat: updatedChat, isOnline: 'Carregando...' });
+
+    // Limpar mensagens do chat anterior imediatamente
+    setMessages([]);
 
     let onlineStatus = chatPresenceStates[chat.id._serialized] || '';
     try {
@@ -369,7 +384,10 @@ export default function ChatPage() {
       console.error('❌ Erro ao verificar status online:', error);
     }
 
+    // Atualizar status online após verificação
     setSelectedChat({ chat: updatedChat, isOnline: onlineStatus });
+
+    // Carregar mensagens
     loadMessages(widToString(chat.id));
 
     // Marcar como lido
@@ -391,17 +409,8 @@ export default function ChatPage() {
     if (!messageContent.trim() || !selectedChat || !session?.user?.name) return;
 
     const messageWithUser = `_*${session.user.name}*_:\n\n${messageContent}`;
-    const tempMessage: Message = {
-      id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      chatId: selectedChat.chat.id,
-      content: messageWithUser,
-      type: 'text',
-      timestamp: Date.now(),
-      fromMe: true,
-      status: 'sending'
-    } as unknown as Message;
 
-    setMessages(prev => [...prev, tempMessage]);
+    // Forçar scroll para baixo imediatamente para dar feedback visual
     setForceScrollToBottom(true);
     setTimeout(() => setForceScrollToBottom(false), 100);
 
@@ -416,21 +425,11 @@ export default function ChatPage() {
       });
 
       const data = await response.json();
-      if (data.success && data.messageId) {
-        setMessages(prev => prev.map(m => m.id === tempMessage.id ? {
-          ...m,
-          id: data.messageId,
-          status: 'sent',
-          ack: 1
-        } : m));
-      } else {
-        setMessages(prev => prev.map(m => m.id === tempMessage.id ? { ...m, status: 'sent' } : m));
+      if (!data.success) {
+        console.error('❌ Erro ao enviar mensagem:', data.error);
       }
     } catch (error) {
       console.error('❌ Erro ao enviar mensagem:', error);
-      setTimeout(() => {
-        setMessages(prev => prev.map(m => m.id === tempMessage.id ? { ...m, status: 'delivered' } : m));
-      }, 1000);
     }
   };
 
@@ -488,14 +487,55 @@ export default function ChatPage() {
         setAudioStates(prev => ({ ...prev, [messageId]: { ...prev[messageId], isPlaying: false } }));
       };
 
+      newAudio.onloadedmetadata = () => {
+        setAudioStates(prev => ({
+          ...prev,
+          [messageId]: {
+            ...prev[messageId],
+            duration: newAudio.duration
+          }
+        }));
+      };
+
       newAudio.oncanplaythrough = () => {
         newAudio.addEventListener('timeupdate', () => {
-          setAudioStates(prev => ({ ...prev, [messageId]: { ...prev[messageId], progress: (newAudio.currentTime / newAudio.duration) * 100 } }));
+          setAudioStates(prev => ({
+            ...prev,
+            [messageId]: {
+              ...prev[messageId],
+              progress: (newAudio.currentTime / newAudio.duration) * 100,
+              currentTime: newAudio.currentTime
+            }
+          }));
         });
         newAudio.addEventListener('ended', () => {
-          setAudioStates(prev => ({ ...prev, [messageId]: { ...prev[messageId], isPlaying: false, progress: 0 } }));
+          setAudioStates(prev => ({
+            ...prev,
+            [messageId]: {
+              ...prev[messageId],
+              isPlaying: false,
+              progress: 0,
+              currentTime: 0
+            }
+          }));
         });
-        setAudioStates(prev => ({ ...prev, [messageId]: { isPlaying: true, progress: 0, audio: newAudio } }));
+        setAudioStates(prev => {
+          const currentRate = prev[messageId]?.playbackRate || 1;
+          newAudio.playbackRate = currentRate;
+          return {
+            ...prev,
+            [messageId]: {
+              ...prev[messageId], // Preserva propriedades existentes (incluindo playbackRate se já definido)
+              isPlaying: true,
+              progress: 0,
+              audio: newAudio,
+              playbackRate: currentRate,
+              currentTime: 0,
+              duration: newAudio.duration,
+              hasStartedOnce: true
+            }
+          };
+        });
         newAudio.play().catch(err => console.error('❌ Erro ao tocar áudio:', err));
       };
     } else {
@@ -506,10 +546,37 @@ export default function ChatPage() {
         audio?.pause();
         setAudioStates(prev => ({ ...prev, [messageId]: { ...prev[messageId], isPlaying: false } }));
       } else {
+        // Aplicar a velocidade atual antes de tocar
+        const currentRate = audioStates[messageId]?.playbackRate || 1;
+        if (audio) {
+          audio.playbackRate = currentRate;
+        }
         audio?.play().catch(err => console.error('❌ Erro ao tocar áudio:', err));
-        setAudioStates(prev => ({ ...prev, [messageId]: { ...prev[messageId], isPlaying: true } }));
+        setAudioStates(prev => ({
+          ...prev,
+          [messageId]: {
+            ...prev[messageId],
+            isPlaying: true,
+            hasStartedOnce: true
+          }
+        }));
       }
     }
+  }, [audioStates]);
+
+  const handleAudioSpeedChange = useCallback((messageId: string, speed: number) => {
+    const audio = audioStates[messageId]?.audio;
+    if (audio) {
+      audio.playbackRate = speed;
+    }
+    // Sempre atualizar o estado, mesmo se o áudio ainda não existir
+    setAudioStates(prev => ({
+      ...prev,
+      [messageId]: {
+        ...prev[messageId],
+        playbackRate: speed
+      }
+    }));
   }, [audioStates]);
 
   const handleAudioProgress = useCallback((e: React.MouseEvent<HTMLDivElement>, messageId: string) => {
@@ -536,12 +603,44 @@ export default function ChatPage() {
   // === SOCKET LISTENERS ===
   const processedMessageIds = useRef<Set<string>>(new Set());
 
+  // Função para buscar dados de mídia
+  const fetchMediaData = useCallback(async (messageId: string, messageType: string) => {
+    if (!['image', 'video', 'document', 'ptt', 'sticker'].includes(messageType)) {
+      return null;
+    }
+
+    try {
+      const mediaUrl = `/api/chat/media/${messageId}`;
+      const response = await fetch(mediaUrl);
+
+      if (response.ok) {
+        const mediaData = await response.json();
+
+        // Extrair base64 puro se vier com prefixo data:
+        let cleanBase64 = mediaData.base64;
+        if (typeof cleanBase64 === 'string' && cleanBase64.includes('base64,')) {
+          cleanBase64 = cleanBase64.split('base64,').pop() || cleanBase64;
+        }
+
+        return {
+          body: cleanBase64 || null,
+          mimetype: mediaData.mimetype || null,
+          caption: mediaData.caption || null
+        };
+      }
+    } catch (error) {
+      console.error(`Erro ao buscar mídia para ${messageId}:`, error);
+    }
+
+    return null;
+  }, []);
+
   // Listener para novas mensagens
   useEffect(() => {
     if (newMessages.length === 0) return;
 
     const latestMessage = newMessages[newMessages.length - 1];
-    if (processedMessageIds.current.has(latestMessage.id) || latestMessage.fromMe) return;
+    if (processedMessageIds.current.has(latestMessage.id)) return;
 
     processedMessageIds.current.add(latestMessage.id);
     const chatId = latestMessage.chatId;
@@ -558,7 +657,8 @@ export default function ChatPage() {
           content: latestMessage.content || latestMessage.body,
           timestamp: latestMessage.timestamp || latestMessage.t
         } as any,
-        unreadCount: (prevChats[chatIndex].unreadCount || 0) + 1
+        // Só incrementar unreadCount se não for mensagem minha
+        unreadCount: latestMessage.fromMe ? prevChats[chatIndex].unreadCount || 0 : (prevChats[chatIndex].unreadCount || 0) + 1
       };
 
       const newChats = [...prevChats];
@@ -569,28 +669,55 @@ export default function ChatPage() {
 
     // Se for do chat selecionado, adicionar às mensagens
     if (selectedChat && widToString(selectedChat.chat.id) === chatId) {
-      setMessages(prevMessages => {
-        const messageExists = prevMessages.some(msg => msg.id === latestMessage.id);
-        if (messageExists) return prevMessages;
-
-        return [...prevMessages, {
+      // Função assíncrona para processar mensagens com mídia
+      const processMessage = async () => {
+        let messageData = {
           id: latestMessage.id,
           chatId: latestMessage.chatId,
           content: latestMessage.content || latestMessage.body,
           type: latestMessage.type,
           timestamp: latestMessage.timestamp || latestMessage.t,
           fromMe: latestMessage.fromMe,
-          status: 'delivered'
-        } as any];
-      });
+          status: latestMessage.fromMe ? 'sent' as const : 'delivered' as const
+        };
 
-      setChats(prevChats => prevChats.map(chat =>
-        chat.id._serialized === chatId ? { ...chat, unreadCount: 0 } : chat
-      ));
+        // Se for mensagem de mídia, buscar os dados
+        if (['image', 'video', 'document', 'ptt', 'sticker'].includes(latestMessage.type)) {
+          const mediaData = await fetchMediaData(latestMessage.id, latestMessage.type);
+          if (mediaData) {
+            messageData = {
+              ...messageData,
+              ...mediaData
+            } as any;
+          }
+        }
 
-      sendSeenForChat(chatId);
+        setMessages(prevMessages => {
+          const messageExists = prevMessages.some(msg => msg.id === latestMessage.id);
+          if (messageExists) return prevMessages;
+
+          return [...prevMessages, messageData as any];
+        });
+
+        // Sinalizar scroll após a mensagem ser adicionada
+        // Timeout para garantir que o DOM foi atualizado, especialmente importante para mídias
+        setTimeout(() => {
+          setForceScrollToBottom(true);
+          setTimeout(() => setForceScrollToBottom(false), 100);
+        }, 100);
+      };
+
+      processMessage();
+
+      // Só marcar como lido e enviar seen se não for mensagem minha
+      if (!latestMessage.fromMe) {
+        setChats(prevChats => prevChats.map(chat =>
+          chat.id._serialized === chatId ? { ...chat, unreadCount: 0 } : chat
+        ));
+        sendSeenForChat(chatId);
+      }
     }
-  }, [newMessages, selectedChat]);
+  }, [newMessages, selectedChat, fetchMediaData]);
 
   // Listener para ACKs
   useEffect(() => {
@@ -715,12 +842,12 @@ export default function ChatPage() {
   }
 
   // === FLUXO CORRETO DE ESTADOS ===
-  
+
   // 1. Se socket desconectado → Tela "API desligada"
   if (connectionState.status === 'server_offline') {
     return (
-      <QRCodeDisplay 
-        qrCode={null} 
+      <QRCodeDisplay
+        qrCode={null}
         onGenerateNew={generateQRCode}
         connectionState={{
           status: connectionState.status,
@@ -731,12 +858,12 @@ export default function ChatPage() {
   }
 
   // 2. Se estado UNPAIRED → Tela QR Code
-  if (connectionState.status === 'qr_required' || 
-      connectionState.sessionState === 'UNPAIRED' ||
-      connectionState.sessionState === 'UNPAIRED_IDLE') {
+  if (connectionState.status === 'qr_required' ||
+    connectionState.sessionState === 'UNPAIRED' ||
+    connectionState.sessionState === 'UNPAIRED_IDLE') {
     return (
-      <QRCodeDisplay 
-        qrCode={connectionState.qrCode} 
+      <QRCodeDisplay
+        qrCode={connectionState.qrCode}
         onGenerateNew={generateQRCode}
         connectionState={{
           status: connectionState.status,
@@ -747,12 +874,12 @@ export default function ChatPage() {
   }
 
   // 3. Se conectando (após QR Code) → Mostrar feedback de conexão
-  if (connectionState.status === 'connecting' || 
-      connectionState.sessionState === 'PAIRING' ||
-      connectionState.sessionState === 'OPENING') {
+  if (connectionState.status === 'connecting' ||
+    connectionState.sessionState === 'PAIRING' ||
+    connectionState.sessionState === 'OPENING') {
     return (
-      <QRCodeDisplay 
-        qrCode={connectionState.qrCode} 
+      <QRCodeDisplay
+        qrCode={connectionState.qrCode}
         onGenerateNew={generateQRCode}
         connectionState={{
           status: connectionState.status,
@@ -839,6 +966,8 @@ export default function ChatPage() {
                   onAudioPlay={handleAudioPlay}
                   onAudioProgress={handleAudioProgress}
                   onMediaModal={handleMediaModal}
+                  onAudioSpeedChange={handleAudioSpeedChange}
+                  profilePics={profilePics}
                   onLoadMoreMessages={() => selectedChat && loadMessages(widToString(selectedChat.chat.id), true)}
                   hasMoreMessages={messagesState.hasMoreMessages}
                   isLoadingMessages={messagesState.isLoadingMessages}

@@ -24,7 +24,15 @@ export const widToString = (wid: string | Wid): string => {
 // }
 
 
-export type Message = WppMessage;
+// Estender WppMessage com propriedades customizadas para mídia
+export interface Message extends WppMessage {
+  body?: string; // Base64 da mídia
+  mimetype?: string; // Tipo MIME da mídia
+  caption?: string; // Legenda da mídia
+  vcardFormattedName?: string; // Nome formatado do vCard
+  status?: 'sending' | 'sent' | 'delivered' | 'read' | 'received';
+  isGif?: boolean; // Indica se o vídeo é um GIF
+}
 
 export type Chats = Omit<WppChat, `lastReceivedKey`> & { lastReceivedKey: Message | null };
 

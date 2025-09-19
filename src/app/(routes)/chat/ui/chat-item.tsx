@@ -3,7 +3,9 @@
 //importar bibliotecas e funções
 import { Chats } from '@/app/(routes)/chat/types/chat';
 import { Message } from '@wppconnect-team/wppconnect';
-import { HiOutlineDocument, HiOutlineEmojiHappy, HiOutlineMicrophone, HiOutlinePhotograph, HiOutlineUser, HiOutlineUserGroup, HiOutlineVideoCamera } from 'react-icons/hi';
+import { HiOutlineDocument, HiOutlineMicrophone, HiOutlinePhotograph, HiOutlineUser, HiOutlineUserGroup, HiOutlineVideoCamera } from 'react-icons/hi';
+import { PiSticker } from 'react-icons/pi';
+import { AiOutlineGif } from "react-icons/ai";
 
 //função principal
 interface ChatItemProps {
@@ -14,6 +16,28 @@ interface ChatItemProps {
   onSelect: (chat: Chats) => void
 };
 const ChatItem: React.FC<ChatItemProps> = ({ chat, isSelected, profilePic, presenceStatus, onSelect }) => {
+
+  //formatar número de telefone (mesma lógica do formattedName)
+  const formatPhoneNumber = (phoneNumber: string) => {
+    // Remove a parte @c.us se existir
+    const cleanNumber = phoneNumber.split('@')[0];
+
+    // Se tem 13 dígitos e começa com 55, é um número brasileiro
+    if (cleanNumber.length === 13 && cleanNumber.startsWith('55')) {
+      const countryCode = cleanNumber.substring(0, 2); // 55
+      const areaCode = cleanNumber.substring(2, 4); // DD
+      const firstPart = cleanNumber.substring(4, 9); // 9XXXX
+      const secondPart = cleanNumber.substring(9, 13); // XXXX
+      return `+${countryCode} ${areaCode} ${firstPart}-${secondPart}`;
+    }
+
+    // Se não for padrão brasileiro, retorna com +55 na frente se não tiver
+    if (!cleanNumber.startsWith('55')) {
+      return `+55 ${cleanNumber}`;
+    }
+
+    return `+${cleanNumber}`;
+  };
 
   //formatar o conteúdo da mensagem
   const formatMessageBody = (message: Message) => {
@@ -26,13 +50,26 @@ const ChatItem: React.FC<ChatItemProps> = ({ chat, isSelected, profilePic, prese
       </div>
     );
 
-    //se for video
-    if (message.type === `video`) return (
-      <div className="flex items-center justify-start | gap-1">
-        <HiOutlineVideoCamera className="w-[0.95rem] h-[0.95rem]" />
-        <span>Vídeo</span>
-      </div>
-    );
+    //se for video ou gif
+    if (message.type === `video`) {
+
+      // Verificar se é GIF
+      if (message.isGif) {
+        return (
+          <div className="flex items-center justify-start | gap-1">
+            <AiOutlineGif className="w-[0.95rem] h-[0.95rem]" />
+            <span>GIF</span>
+          </div>
+        );
+      }
+
+      return (
+        <div className="flex items-center justify-start | gap-1">
+          <HiOutlineVideoCamera className="w-[0.95rem] h-[0.95rem]" />
+          <span>Vídeo</span>
+        </div>
+      );
+    }
 
     //se for audio
     if (message.type === `ptt`) return (
@@ -53,13 +90,16 @@ const ChatItem: React.FC<ChatItemProps> = ({ chat, isSelected, profilePic, prese
     //se for sticker
     if (message.type === `sticker`) return (
       <div className="flex items-center justify-start | gap-1">
-        <HiOutlineEmojiHappy className="w-[0.9rem] h-[0.9rem] mb-[0.13rem]" />
+        <PiSticker className="w-[0.9rem] h-[0.9rem] mb-[0.13rem]" />
         <span>Sticker</span>
       </div>
     );
 
     // Remover formatação do WhatsApp para exibição no sidebar
     const removeWhatsAppFormatting = (text: string) => {
+      if (!text || typeof text !== 'string') {
+        return '';
+      }
       return text
         .replace(/\*(.*?)\*/g, '$1') // Remove asteriscos (negrito)
         .replace(/_(.*?)_/g, '$1')   // Remove underlines (itálico)
@@ -68,7 +108,25 @@ const ChatItem: React.FC<ChatItemProps> = ({ chat, isSelected, profilePic, prese
         .trim();
     };
 
-    return (<>{removeWhatsAppFormatting(message.content)}</>);
+    // Tratamento especial para diferentes tipos de mensagem
+    const getMessagePreview = () => {
+      if (!message.content && message.type) {
+        // Para mensagens de mídia sem content, mostrar tipo
+        switch (message.type) {
+          case 'image': return '📷 Imagem';
+          case 'video': return message.isGif ? '🎬 GIF' : '🎥 Vídeo';
+          case 'sticker': return '🎭 Sticker';
+          case 'audio':
+          case 'ptt': return '🎵 Áudio';
+          case 'document': return '📄 Documento';
+          case 'vcard': return '👤 Contato';
+          default: return '💬 Mídia';
+        }
+      }
+      return removeWhatsAppFormatting(message.content || '');
+    };
+
+    return (<>{getMessagePreview()}</>);
   };
 
   const formatMessageTime = (timestamp: number) => {
@@ -172,7 +230,16 @@ const ChatItem: React.FC<ChatItemProps> = ({ chat, isSelected, profilePic, prese
             {presenceStatus && presenceStatus !== 'Online' ? (
               <p className="font-bold text-green-600 italic">{presenceStatus}</p>
             ) : (
-              chat.lastReceivedKey ? formatMessageBody(chat.lastReceivedKey) : ``
+              chat.lastReceivedKey ? (
+                <>
+                  {chat.isGroup && chat.lastReceivedKey.sender?.formattedName && (
+                    <span>
+                      {chat.lastReceivedKey.sender.formattedName}:{' '}
+                    </span>
+                  )}
+                  {formatMessageBody(chat.lastReceivedKey)}
+                </>
+              ) : ``
             )}
           </div>
         </div>

@@ -33,7 +33,15 @@ const scrollbarStyles = `
 `;
 
 interface AudioStates {
-  [key: string]: { isPlaying: boolean; progress: number; audio?: HTMLAudioElement };
+  [key: string]: { 
+    isPlaying: boolean; 
+    progress: number; 
+    audio?: HTMLAudioElement;
+    playbackRate?: number;
+    currentTime?: number;
+    duration?: number;
+    hasStartedOnce?: boolean;
+  };
 }
 
 interface MessageListProps {
@@ -42,6 +50,8 @@ interface MessageListProps {
   onAudioPlay: (messageId: string, audioBase64: string) => void;
   onAudioProgress: (e: React.MouseEvent<HTMLDivElement>, messageId: string) => void;
   onMediaModal: (isOpen: boolean, type: string, url: string) => void;
+  onAudioSpeedChange?: (messageId: string, speed: number) => void;
+  profilePics?: Record<string, string | null>;
   onLoadMoreMessages?: () => void;
   hasMoreMessages?: boolean;
   isLoadingMessages?: boolean;
@@ -57,6 +67,8 @@ export function MessageList({
   onAudioPlay,
   onAudioProgress,
   onMediaModal,
+  onAudioSpeedChange,
+  profilePics,
   onLoadMoreMessages,
   hasMoreMessages,
   isLoadingMessages,
@@ -199,7 +211,21 @@ export function MessageList({
         const isNearBottom = container.scrollTop >= container.scrollHeight - container.clientHeight - 100;
 
         if ((isNearBottom || scrollToBottom) && endMessagesRef.current) {
-          endMessagesRef.current.scrollIntoView({ behavior: 'smooth' });
+          // Para mensagens forçadas (scrollToBottom), usar múltiplas tentativas para garantir scroll
+          if (scrollToBottom) {
+            // Primeira tentativa imediata
+            endMessagesRef.current.scrollIntoView({ behavior: 'smooth' });
+            
+            // Segunda tentativa após o DOM estar completamente renderizado
+            setTimeout(() => {
+              if (endMessagesRef.current) {
+                endMessagesRef.current.scrollIntoView({ behavior: 'smooth' });
+              }
+            }, 150);
+          } else {
+            // Para mensagens normais próximas ao final, scroll simples
+            endMessagesRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
         }
       }
 
@@ -284,6 +310,9 @@ export function MessageList({
               onAudioPlay={onAudioPlay}
               onAudioProgress={onAudioProgress}
               onMediaModal={onMediaModal}
+              onAudioSpeedChange={onAudioSpeedChange}
+              profilePics={profilePics}
+              selectedChatId={chatId}
             />
           ))}
           <div ref={endMessagesRef} />
