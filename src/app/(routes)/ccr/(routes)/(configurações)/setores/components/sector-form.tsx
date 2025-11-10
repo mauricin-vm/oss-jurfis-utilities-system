@@ -129,7 +129,7 @@ export function SectorForm({ initialData }: SectorFormProps) {
               <FormControl>
                 <Input
                   placeholder="Ex: Fiscalização"
-                  className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                   {...field}
                 />
               </FormControl>
@@ -147,7 +147,7 @@ export function SectorForm({ initialData }: SectorFormProps) {
                 <FormControl>
                   <Input
                     placeholder="Ex: FISC"
-                    className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     {...field}
                   />
                 </FormControl>
@@ -164,7 +164,7 @@ export function SectorForm({ initialData }: SectorFormProps) {
                 <FormControl>
                   <Input
                     placeholder="Ex: FIS-001"
-                    className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     {...field}
                   />
                 </FormControl>
@@ -182,7 +182,7 @@ export function SectorForm({ initialData }: SectorFormProps) {
               <FormControl>
                 <Textarea
                   placeholder="Descreva as funções e responsabilidades do setor..."
-                  className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[100px] resize-none"
+                  className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[100px] resize-none"
                   {...field}
                 />
               </FormControl>
@@ -200,7 +200,7 @@ export function SectorForm({ initialData }: SectorFormProps) {
                 <FormControl>
                   <Input
                     placeholder="(00) 00000-0000"
-                    className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     value={field.value}
                     onChange={(e) => {
                       const formatted = formatPhone(e.target.value);
@@ -222,7 +222,7 @@ export function SectorForm({ initialData }: SectorFormProps) {
                   <Input
                     type="email"
                     placeholder="setor@exemplo.com"
-                    className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     {...field}
                   />
                 </FormControl>
@@ -240,7 +240,7 @@ export function SectorForm({ initialData }: SectorFormProps) {
               <FormControl>
                 <Textarea
                   placeholder="Ex: Rua Exemplo, 123 - Bairro - Cidade/UF"
-                  className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[80px] resize-none"
+                  className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[80px] resize-none"
                   {...field}
                 />
               </FormControl>

@@ -135,7 +135,7 @@ export function SubjectForm({ initialData }: SubjectFormProps) {
               <FormControl>
                 <Input
                   placeholder="Ex: Isenção de IPTU"
-                  className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                   {...field}
                 />
               </FormControl>
@@ -153,7 +153,7 @@ export function SubjectForm({ initialData }: SubjectFormProps) {
                 <Textarea
                   placeholder="Descrição detalhada do assunto"
                   rows={3}
-                  className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 resize-none"
+                  className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 resize-none"
                   {...field}
                 />
               </FormControl>
@@ -173,7 +173,7 @@ export function SubjectForm({ initialData }: SubjectFormProps) {
                 disabled={loadingSubjects}
               >
                 <FormControl>
-                  <SelectTrigger className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
+                  <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
                     <SelectValue placeholder="Nenhum (assunto principal)" />
                   </SelectTrigger>
                 </FormControl>

@@ -237,7 +237,7 @@ export function AddRecordModal({ isOpen, onClose, onSave }: AddRecordModalProps)
                   onValueChange={(value) => setFormData({ ...formData, month: Number(value) })}
                   disabled={isSubmitting}
                 >
-                  <SelectTrigger className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
+                  <SelectTrigger className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
                     <SelectValue placeholder="Selecione o mês" />
                   </SelectTrigger>
                   <SelectContent className="rounded-lg">
@@ -263,7 +263,7 @@ export function AddRecordModal({ isOpen, onClose, onSave }: AddRecordModalProps)
                   onValueChange={(value) => setFormData({ ...formData, year: Number(value) })}
                   disabled={isSubmitting}
                 >
-                  <SelectTrigger className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
+                  <SelectTrigger className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
                     <SelectValue placeholder="Selecione o ano" />
                   </SelectTrigger>
                   <SelectContent className="rounded-lg">
@@ -291,7 +291,7 @@ export function AddRecordModal({ isOpen, onClose, onSave }: AddRecordModalProps)
                   type="text"
                   value={extraHoursInput}
                   onChange={(e) => handleExtraHoursChange(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
+                  className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                   placeholder="00:00"
                   disabled={isSubmitting}
                 />
@@ -305,7 +305,7 @@ export function AddRecordModal({ isOpen, onClose, onSave }: AddRecordModalProps)
                   type="text"
                   value={lateHoursInput}
                   onChange={(e) => handleLateHoursChange(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
+                  className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                   placeholder="00:00"
                   disabled={isSubmitting}
                 />

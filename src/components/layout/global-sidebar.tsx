@@ -82,26 +82,6 @@ export function GlobalSidebar({ onLogin }: GlobalSidebarProps) {
           </SidebarGroup>
         )}
 
-        {/* Custom Actions */}
-        {config.customActions && config.customActions.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Ações</SidebarGroupLabel>
-            <SidebarMenu>
-              {config.customActions.map((action, index) => (
-                <SidebarMenuItem key={index}>
-                  <SidebarMenuButton
-                    onClick={action.onClick}
-                    className="cursor-pointer"
-                  >
-                    {action.icon && <action.icon className="size-4" />}
-                    <span>{action.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroup>
-        )}
-
         {/* Custom Sections */}
         {config.customSections && config.customSections.map((section, sectionIndex) => (
           <SidebarGroup key={sectionIndex}>
@@ -254,6 +234,26 @@ export function GlobalSidebar({ onLogin }: GlobalSidebarProps) {
             </SidebarMenu>
           </SidebarGroup>
         ))}
+
+        {/* Custom Actions */}
+        {config.customActions && config.customActions.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Ações</SidebarGroupLabel>
+            <SidebarMenu>
+              {config.customActions.map((action, index) => (
+                <SidebarMenuItem key={index}>
+                  <SidebarMenuButton
+                    onClick={action.onClick}
+                    className="cursor-pointer"
+                  >
+                    {action.icon && <action.icon className="size-4" />}
+                    <span>{action.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       {/* Footer com NavUser (se configurado) */}

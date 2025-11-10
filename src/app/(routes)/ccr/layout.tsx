@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useSidebarConfig } from '@/contexts/sidebar-context';
 import {
   LayoutDashboard,
@@ -17,11 +18,14 @@ import {
   Building2,
   UserCircle,
   Contact,
+  Plus,
 } from 'lucide-react';
 
 export default function CCRLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const { setConfig } = useSidebarConfig();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const isLoggedIn = !!session;
   const isCheckingSession = status === 'loading';
@@ -93,6 +97,42 @@ export default function CCRLayout({ children }: { children: React.ReactNode }) {
         });
       }
 
+      // Determinar ações customizadas baseadas na rota atual
+      const customActions = [];
+
+      // Se estiver na página de assuntos, adicionar botão "Novo Assunto"
+      if (pathname?.startsWith('/ccr/assuntos')) {
+        customActions.push({
+          label: 'Novo Assunto',
+          icon: Plus,
+          onClick: () => router.push('/ccr/assuntos/novo'),
+        });
+      }
+      // Se estiver na página de membros, adicionar botão "Novo Membro"
+      else if (pathname?.startsWith('/ccr/membros')) {
+        customActions.push({
+          label: 'Novo Membro',
+          icon: Plus,
+          onClick: () => router.push('/ccr/membros/novo'),
+        });
+      }
+      // Se estiver na página de setores, adicionar botão "Novo Setor"
+      else if (pathname?.startsWith('/ccr/setores')) {
+        customActions.push({
+          label: 'Novo Setor',
+          icon: Plus,
+          onClick: () => router.push('/ccr/setores/novo'),
+        });
+      }
+      // Se estiver na página de protocolos, adicionar botão "Novo Protocolo"
+      else if (pathname?.startsWith('/ccr/protocolos')) {
+        customActions.push({
+          label: 'Novo Protocolo',
+          icon: Plus,
+          onClick: () => router.push('/ccr/protocolos/novo'),
+        });
+      }
+
       setConfig({
         showAppSwitcher: true,
         showUserAuth: true,
@@ -102,7 +142,7 @@ export default function CCRLayout({ children }: { children: React.ReactNode }) {
           menuItems,
         },
       ],
-      customActions: [],
+      customActions,
     });
     } else {
       // Se não estiver logado OU não for da organização correta, não mostrar menu
@@ -114,7 +154,7 @@ export default function CCRLayout({ children }: { children: React.ReactNode }) {
         customContent: null,
       });
     }
-  }, [isCheckingSession, isLoggedIn, session?.user, hasAccess, setConfig]);
+  }, [isCheckingSession, isLoggedIn, session?.user, hasAccess, setConfig, pathname, router, isExternal]);
 
   return <>{children}</>;
 }

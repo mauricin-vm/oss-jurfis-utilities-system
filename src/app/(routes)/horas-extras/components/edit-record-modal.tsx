@@ -224,7 +224,7 @@ export function EditRecordModal({ isOpen, record, onClose, onSave }: EditRecordM
                   type="text"
                   value={extraHoursInput}
                   onChange={(e) => handleExtraHoursChange(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
+                  className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                   placeholder="00:00"
                   disabled={isSubmitting}
                 />
@@ -238,7 +238,7 @@ export function EditRecordModal({ isOpen, record, onClose, onSave }: EditRecordM
                   type="text"
                   value={lateHoursInput}
                   onChange={(e) => handleLateHoursChange(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
+                  className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                   placeholder="00:00"
                   disabled={isSubmitting}
                 />

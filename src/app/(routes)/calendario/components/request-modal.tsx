@@ -252,7 +252,7 @@ export function RequestModal({ isOpen, onClose, onSuccess }: RequestModalProps) 
                 type="text"
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
+                className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                 placeholder="Ex: Reunião de Planejamento"
                 disabled={isSubmitting}
               />
@@ -268,7 +268,7 @@ export function RequestModal({ isOpen, onClose, onSuccess }: RequestModalProps) 
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
+                  className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                   disabled={isSubmitting}
                 />
               </div>
@@ -281,7 +281,7 @@ export function RequestModal({ isOpen, onClose, onSuccess }: RequestModalProps) 
                   type="time"
                   value={formData.startTime}
                   onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
+                  className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                   disabled={isSubmitting}
                 />
               </div>
@@ -294,7 +294,7 @@ export function RequestModal({ isOpen, onClose, onSuccess }: RequestModalProps) 
                   type="time"
                   value={formData.endTime}
                   onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
+                  className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                   disabled={isSubmitting}
                 />
               </div>
@@ -309,7 +309,7 @@ export function RequestModal({ isOpen, onClose, onSuccess }: RequestModalProps) 
                 type="text"
                 value={formData.requestedBy}
                 onChange={(e) => setFormData({ ...formData, requestedBy: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
+                className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                 placeholder="Seu nome completo"
                 disabled={isSubmitting}
               />
@@ -325,7 +325,7 @@ export function RequestModal({ isOpen, onClose, onSuccess }: RequestModalProps) 
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
+                  className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                   placeholder="seu@email.com"
                   disabled={isSubmitting}
                 />
@@ -340,7 +340,7 @@ export function RequestModal({ isOpen, onClose, onSuccess }: RequestModalProps) 
                   defaultValue={formatPhoneForDisplay(formData.phone)}
                   onChange={handlePhoneChange}
                   onBlur={handlePhoneBlur}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
+                  className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                   placeholder="(67) 00000-0000"
                   disabled={isSubmitting}
                 />
@@ -355,7 +355,7 @@ export function RequestModal({ isOpen, onClose, onSuccess }: RequestModalProps) 
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors resize-none"
+                className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors resize-none"
                 rows={3}
                 placeholder="Informações adicionais sobre a reunião"
                 disabled={isSubmitting}

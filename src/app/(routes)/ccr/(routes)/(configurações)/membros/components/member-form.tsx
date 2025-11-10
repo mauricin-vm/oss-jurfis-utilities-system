@@ -155,7 +155,7 @@ export function MemberForm({ initialData }: MemberFormProps) {
               <FormControl>
                 <Input
                   placeholder="Ex: João Silva"
-                  className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                   {...field}
                 />
               </FormControl>
@@ -173,7 +173,7 @@ export function MemberForm({ initialData }: MemberFormProps) {
                 <FormControl>
                   <Input
                     placeholder="Ex: Conselheiro Titular"
-                    className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     {...field}
                   />
                 </FormControl>
@@ -194,7 +194,7 @@ export function MemberForm({ initialData }: MemberFormProps) {
                   defaultValue={field.value || 'none'}
                 >
                   <FormControl>
-                    <SelectTrigger className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
+                    <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
                       <SelectValue placeholder="Selecione o gênero" />
                     </SelectTrigger>
                   </FormControl>
@@ -219,7 +219,7 @@ export function MemberForm({ initialData }: MemberFormProps) {
                 <FormControl>
                   <Input
                     placeholder="000.000.000-00"
-                    className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     value={field.value}
                     onChange={(e) => {
                       const formatted = formatCPF(e.target.value);
@@ -240,7 +240,7 @@ export function MemberForm({ initialData }: MemberFormProps) {
                 <FormControl>
                   <Input
                     placeholder="Ex: 123456"
-                    className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     {...field}
                   />
                 </FormControl>
@@ -258,7 +258,7 @@ export function MemberForm({ initialData }: MemberFormProps) {
               <FormControl>
                 <Input
                   placeholder="Ex: Município, OAB/MS"
-                  className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                  className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                   {...field}
                 />
               </FormControl>
@@ -276,7 +276,7 @@ export function MemberForm({ initialData }: MemberFormProps) {
                 <FormControl>
                   <Input
                     placeholder="(00) 00000-0000"
-                    className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     value={field.value}
                     onChange={(e) => {
                       const formatted = formatPhone(e.target.value);
@@ -298,7 +298,7 @@ export function MemberForm({ initialData }: MemberFormProps) {
                   <Input
                     type="email"
                     placeholder="exemplo@email.com"
-                    className="px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     {...field}
                   />
                 </FormControl>

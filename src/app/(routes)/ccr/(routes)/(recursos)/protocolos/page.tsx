@@ -2,46 +2,40 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useSession } from 'next-auth/react';
 import { ProtocolTable } from './components/protocol-table';
-import { CCRPageWrapper } from '../components/ccr-page-wrapper';
+import { CCRPageWrapper } from '../../../components/ccr-page-wrapper';
 
 interface Protocol {
   id: string;
   number: string;
-  originationDate: Date;
-  receptionDate: Date;
-  subject: string;
+  processNumber: string;
+  presenter: string;
   status: string;
-  isActive: boolean;
+  createdAt: Date;
+  isLatest: boolean; // Flag que indica se é o último protocolo criado
   employee: {
     id: string;
     name: string;
   };
-  sector?: {
-    id: string;
-    name: string;
-    abbreviation: string | null;
-  } | null;
-  protocolParts: Array<{
-    part: {
-      id: string;
-      name: string;
-    };
-  }>;
   _count?: {
     tramitations: number;
   };
   resource?: any;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export default function ProtocolosPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [protocols, setProtocols] = useState<Protocol[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Verificar acesso
+  useEffect(() => {
+    if (session?.user?.role === 'EXTERNAL') {
+      router.push('/ccr');
+    }
+  }, [session, router]);
 
   useEffect(() => {
     fetchProtocols();
@@ -62,19 +56,25 @@ export default function ProtocolosPage() {
     }
   };
 
+  // Se ainda está carregando a sessão, não renderizar nada
+  if (status === 'loading') {
+    return null;
+  }
+
+  // Se é EXTERNAL, não renderizar o conteúdo (redirecionamento já está acontecendo)
+  if (session?.user?.role === 'EXTERNAL') {
+    return null;
+  }
+
   return (
     <CCRPageWrapper title="Protocolos">
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold tracking-tight">Protocolos</h2>
-          <Button onClick={() => router.push('/ccr/protocolos/novo')}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Protocolo
-          </Button>
-        </div>
-
-        <ProtocolTable data={protocols} loading={loading} onRefresh={fetchProtocols} />
-      </div>
+      <ProtocolTable
+        data={protocols}
+        loading={loading}
+        onRefresh={fetchProtocols}
+        onNewProtocol={() => router.push('/ccr/protocolos/novo')}
+        userRole={session?.user?.role}
+      />
     </CCRPageWrapper>
   );
 }

@@ -151,23 +151,17 @@ model OvertimeRecord {
 // ============================================
 // Representa as partes envolvidas (requerente, patrono, representante, etc)
 model Part {
-  id          String   @id @default(uuid())
+  id            String   @id @default(uuid())
 
-  // Informações da parte
-  name        String   // Nome completo da parte
-  role        PartRole // Papel no processo (REQUERENTE, PATRONO, etc)
-  document    String?  // CPF/CNPJ (opcional)
-  notes       String?  @db.Text
-
-  // Vinculações opcionais (FK nullable)
-  protocolId  String?
-  protocol    Protocol? @relation(fields: [protocolId], references: [id], onDelete: Cascade)
-
-  resourceId  String?
-  resource    Resource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  // Informações da parte (pessoa única dentro de um processo)
+  name          String   // Nome completo da parte
+  role          PartRole // Papel no processo (REQUERENTE, PATRONO, etc)
+  document      String?  // CPF/CNPJ (opcional)
+  processNumber String   // Número do processo ao qual esta parte pertence
 
   // Relacionamentos
-  contacts    Contact[] // Contatos da parte (telefones/emails)
+  protocols   ProtocolPart[] // Protocolos que usam esta parte
+  contacts    Contact[]      // Contatos da parte (telefones/emails)
 
   // Auditoria
   createdBy   String
@@ -175,9 +169,10 @@ model Part {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@index([protocolId])
-  @@index([resourceId])
+  @@unique([name, role, processNumber]) // Uma pessoa com mesmo nome e role é única dentro do processo
+  @@index([name])
   @@index([role])
+  @@index([processNumber])
   @@map("CCR_Part")
   @@schema("jurfis")
 }
@@ -185,13 +180,20 @@ model Part {
 // ============================================
 // TABELA DE CONTATOS
 // ============================================
-// Contatos (telefones/emails) vinculados a uma parte
+// Contatos (telefones/emails) vinculados a uma parte e protocolo
 model Contact {
   id            String   @id @default(uuid())
 
   // Vinculação obrigatória à parte
   partId String
-  part          Part @relation(fields: [partId], references: [id], onDelete: Cascade)
+  part          Part @relation(fields: [partId], references: [id], onDelete: Restrict)
+
+  // Vinculação ao protocolo que criou este contato
+  protocolId    String
+  protocol      Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+
+  // Número do processo (para consultas futuras)
+  processNumber String
 
   // Informações do contato
   type        ContactType // TELEFONE ou EMAIL
@@ -201,9 +203,6 @@ model Contact {
   isPrimary   Boolean  @default(false) // Contato principal da parte
   isVerified  Boolean  @default(false) // Contato verificado
 
-  // Observações
-  notes       String?  @db.Text
-
   // Auditoria
   createdBy   String?
   createdByUser User? @relation("ContactCreatedBy", fields: [createdBy], references: [id])
@@ -211,9 +210,32 @@ model Contact {
   updatedAt   DateTime @updatedAt
 
   @@index([partId])
+  @@index([protocolId])
+  @@index([processNumber])
   @@index([type])
   @@index([value]) // Para busca rápida por email/telefone
   @@map("CCR_Contact")
+  @@schema("jurfis")
+}
+
+// ============================================
+// TABELA DE JUNÇÃO: PROTOCOL <-> PART
+// ============================================
+model ProtocolPart {
+  id          String   @id @default(uuid())
+
+  protocolId  String
+  protocol    Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+
+  partId      String
+  part        Part     @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@unique([protocolId, partId]) // Uma parte não pode ser adicionada duas vezes ao mesmo protocolo
+  @@index([protocolId])
+  @@index([partId])
+  @@map("CCR_ProtocolPart")
   @@schema("jurfis")
 }
 
@@ -231,21 +253,19 @@ model Protocol {
   employeeId    String   // Quem fez o protocolo
   employee      User     @relation("ProtocolEmployee", fields: [employeeId], references: [id])
   status        ProtocolStatus @default(PENDENTE) // PENDENTE, CONCLUIDO, ARQUIVADO
-
-  // Análise de Admissibilidade (feita no protocolo)
-  analysisDate         DateTime? // Data da análise de admissibilidade
-  isAdmittedAsResource Boolean?  // true = admitido como recurso, false = não admitido, null = não analisado ainda
-  rejectionReason      String?   @db.Text // Motivo se não for admitido como recurso
+  archiveReason String?   @db.Text // Justificativa quando status = ARQUIVADO
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   // Relacionamentos
-  parts         Part[] // Partes envolvidas no protocolo
-  resource      Resource? // Só existe se isAdmittedAsResource = true
+  parts         ProtocolPart[] // Partes envolvidas no protocolo (N:N)
+  contacts      Contact[]      // Contatos criados neste protocolo
+  resource      Resource?      // Só existe se isAdmittedAsResource = true
   tramitations  Tramitation[]
 
   @@index([year, month, sequenceNumber])
+  @@index([processNumber])
   @@map("CCR_Protocol")
   @@schema("jurfis")
 }
@@ -410,7 +430,7 @@ model Resource {
   decisionYear           Int?     // YYYY
 
   // Relacionamentos
-  parts             Part[] // Partes envolvidas no recurso (incluindo contribuinte)
+  // Partes são acessadas via processNumber: Part.findMany({ where: { processNumber } })
   subjects          SubjectChildren[] // Assuntos do recurso (many-to-many com hierarquia)
   registrations     Registration[] // Inscrições e valores do recurso
   authorities       Authority[] // Autoridades vinculadas ao recurso

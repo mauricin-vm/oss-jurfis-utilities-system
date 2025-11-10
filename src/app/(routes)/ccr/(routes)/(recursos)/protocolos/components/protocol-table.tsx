@@ -28,42 +28,63 @@ import {
 } from "@/components/ui/select";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { cn } from "@/lib/utils";
-import { MoreHorizontal, Pencil, Trash2, Filter, ChevronLeft, ChevronsLeft, ChevronsRight, ChevronRight, Plus, Search } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, ChevronLeft, ChevronsLeft, ChevronRight, ChevronsRight, Plus, Filter, Search, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { DeleteModal } from './delete-modal';
-import { MemberTableSkeleton } from './member-skeleton';
+import { ConcludeModal } from './conclude-modal';
+import { ProtocolTableSkeleton } from './protocol-skeleton';
 
-interface Member {
+interface Protocol {
   id: string;
-  name: string;
-  role: string | null;
-  cpf: string | null;
-  registration: string | null;
-  agency: string | null;
-  phone: string | null;
-  email: string | null;
-  gender: string | null;
-  isActive: boolean;
+  number: string;
+  processNumber: string;
+  presenter: string;
+  status: string;
+  createdAt: Date;
+  isLatest: boolean; // Flag que indica se é o último protocolo criado
+  employee: {
+    id: string;
+    name: string;
+  };
+  _count?: {
+    tramitations: number;
+  };
+  resource?: any;
 }
 
-interface MemberTableProps {
-  data: Member[];
+interface ProtocolTableProps {
+  data: Protocol[];
   loading: boolean;
   onRefresh: () => void;
-  onNewMember: () => void;
+  onNewProtocol: () => void;
   userRole?: string;
 }
 
-export function MemberTable({ data, loading, onRefresh, onNewMember, userRole }: MemberTableProps) {
+const statusLabels: Record<string, string> = {
+  PENDENTE: 'Pendente',
+  CONCLUIDO: 'Concluído',
+  ARQUIVADO: 'Arquivado',
+};
+
+const statusVariants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  PENDENTE: 'secondary',
+  CONCLUIDO: 'default',
+  ARQUIVADO: 'outline',
+};
+
+export function ProtocolTable({ data, loading, onRefresh, onNewProtocol, userRole }: ProtocolTableProps) {
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const canDelete = userRole === 'ADMIN';
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [genderFilter, setGenderFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [memberToDelete, setMemberToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [protocolToDelete, setProtocolToDelete] = useState<{ id: string; number: string } | null>(null);
+  const [isConcludeModalOpen, setIsConcludeModalOpen] = useState(false);
+  const [protocolToConclude, setProtocolToConclude] = useState<{ id: string; number: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -86,61 +107,93 @@ export function MemberTable({ data, loading, onRefresh, onNewMember, userRole }:
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    setCurrentPage(1);
+    setCurrentPage(1); // Reset para primeira página ao buscar
   };
 
-  const handleDeleteClick = (id: string, name: string) => {
-    setMemberToDelete({ id, name });
+  const handleDeleteClick = (id: string, number: string) => {
+    setProtocolToDelete({ id, number });
     setIsDeleteModalOpen(true);
   };
 
   const handleConfirmDelete = async () => {
-    if (!memberToDelete) return;
+    if (!protocolToDelete) return;
 
     try {
-      setDeletingId(memberToDelete.id);
-      const response = await fetch(`/api/ccr/members/${memberToDelete.id}`, {
+      setDeletingId(protocolToDelete.id);
+      const response = await fetch(`/api/ccr/protocols/${protocolToDelete.id}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
-        toast.success('Membro removido com sucesso');
+        const data = await response.json();
+        toast.success(data.message || 'Protocolo removido com sucesso');
         setIsDeleteModalOpen(false);
-        setMemberToDelete(null);
+        setProtocolToDelete(null);
         onRefresh();
       } else {
-        const data = await response.json();
-        toast.error(data.message || 'Erro ao remover membro');
+        const error = await response.text();
+        toast.error(error || 'Erro ao remover protocolo');
       }
     } catch (error) {
-      console.error('Error deleting member:', error);
-      toast.error('Erro ao remover membro');
+      console.error('Error deleting protocol:', error);
+      toast.error('Erro ao remover protocolo');
     } finally {
       setDeletingId(null);
     }
   };
 
-  // Filtrar dados
-  const filteredData = data.filter((member) => {
-    const statusMatch = statusFilter === 'all' ||
-      (statusFilter === 'active' && member.isActive) ||
-      (statusFilter === 'inactive' && !member.isActive);
+  const handleConcludeClick = (id: string, number: string) => {
+    setProtocolToConclude({ id, number });
+    setIsConcludeModalOpen(true);
+  };
 
-    const genderMatch = genderFilter === 'all' ||
-      (genderFilter === 'male' && member.gender === 'MASCULINO') ||
-      (genderFilter === 'female' && member.gender === 'FEMININO');
+  const handleConfirmConclude = async (type: 'CONCLUIDO' | 'ARQUIVADO', justification?: string) => {
+    if (!protocolToConclude) return;
+
+    try {
+      const response = await fetch(`/api/ccr/protocols/${protocolToConclude.id}/conclude`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, justification }),
+      });
+
+      if (response.ok) {
+        const protocol = await response.json();
+
+        if (type === 'CONCLUIDO') {
+          toast.success(`Protocolo concluído e convertido em recurso ${protocol.resource?.resourceNumber || ''}`);
+        } else {
+          toast.success('Protocolo arquivado com sucesso');
+        }
+
+        setIsConcludeModalOpen(false);
+        setProtocolToConclude(null);
+        onRefresh();
+      } else {
+        const error = await response.text();
+        toast.error(error || 'Erro ao concluir protocolo');
+        throw new Error(error);
+      }
+    } catch (error) {
+      console.error('Error concluding protocol:', error);
+      throw error;
+    }
+  };
+
+  // Filtrar dados
+  const filteredData = data.filter((protocol) => {
+    const statusMatch = statusFilter === 'all' || (protocol.status === statusFilter);
 
     const searchMatch = !searchQuery ||
-      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.role?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.cpf?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      member.email?.toLowerCase().includes(searchQuery.toLowerCase());
+      protocol.number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      protocol.processNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      protocol.presenter.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return statusMatch && genderMatch && searchMatch;
+    return statusMatch && searchMatch;
   });
 
-  // Ordenar dados alfabeticamente
-  const sortedData = filteredData.sort((a, b) => a.name.localeCompare(b.name));
+  // Dados já vêm ordenados pelo número do protocolo (decrescente) do backend
+  const sortedData = filteredData;
 
   // Paginação
   const totalPages = Math.ceil(sortedData.length / itemsPerPage);
@@ -153,19 +206,21 @@ export function MemberTable({ data, loading, onRefresh, onNewMember, userRole }:
     setCurrentPage(1);
   }
 
-  // Contadores
-  const activeMembers = data.filter((m) => m.isActive).length;
-  const inactiveMembers = data.filter((m) => !m.isActive).length;
-  const maleMembers = data.filter((m) => m.gender === 'MASCULINO').length;
-  const femaleMembers = data.filter((m) => m.gender === 'FEMININO').length;
+  // Contar por status
+  const statusCounts = {
+    all: data.length,
+    PENDENTE: data.filter(p => p.status === 'PENDENTE').length,
+    CONCLUIDO: data.filter(p => p.status === 'CONCLUIDO').length,
+    ARQUIVADO: data.filter(p => p.status === 'ARQUIVADO').length,
+  };
 
   if (loading) {
-    return <MemberTableSkeleton />;
+    return <ProtocolTableSkeleton />;
   }
 
   return (
     <div className="space-y-4">
-      {/* Botões de Busca, Filtros e Novo Membro */}
+      {/* Botões de Busca, Filtros e Novo Protocolo */}
       <div className="flex justify-end gap-2">
         {/* Busca Animada */}
         <div className="relative flex items-center">
@@ -179,7 +234,7 @@ export function MemberTable({ data, loading, onRefresh, onNewMember, userRole }:
               <Input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Buscar membros..."
+                placeholder="Buscar protocolos..."
                 value={searchQuery}
                 onChange={handleSearchChange}
                 onBlur={handleSearchBlur}
@@ -215,7 +270,6 @@ export function MemberTable({ data, loading, onRefresh, onNewMember, userRole }:
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[280px] sm:w-[320px] p-0">
             <div className="p-4 space-y-4">
-
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Status
@@ -229,38 +283,16 @@ export function MemberTable({ data, loading, onRefresh, onNewMember, userRole }:
                   </SelectTrigger>
                   <SelectContent className="rounded-md">
                     <SelectItem value="all" className="cursor-pointer h-9">
-                      Todos
+                      Todos ({statusCounts.all})
                     </SelectItem>
-                    <SelectItem value="active" className="cursor-pointer h-9">
-                      Ativos ({activeMembers})
+                    <SelectItem value="PENDENTE" className="cursor-pointer h-9">
+                      Pendente ({statusCounts.PENDENTE})
                     </SelectItem>
-                    <SelectItem value="inactive" className="cursor-pointer h-9">
-                      Inativos ({inactiveMembers})
+                    <SelectItem value="CONCLUIDO" className="cursor-pointer h-9">
+                      Concluído ({statusCounts.CONCLUIDO})
                     </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Gênero
-                </label>
-                <Select
-                  value={genderFilter}
-                  onValueChange={(value) => setGenderFilter(value)}
-                >
-                  <SelectTrigger className="h-10 w-full px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
-                    <SelectValue placeholder="Selecione o gênero" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-md">
-                    <SelectItem value="all" className="cursor-pointer h-9">
-                      Todos
-                    </SelectItem>
-                    <SelectItem value="male" className="cursor-pointer h-9">
-                      Masculino ({maleMembers})
-                    </SelectItem>
-                    <SelectItem value="female" className="cursor-pointer h-9">
-                      Feminino ({femaleMembers})
+                    <SelectItem value="ARQUIVADO" className="cursor-pointer h-9">
+                      Arquivado ({statusCounts.ARQUIVADO})
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -269,15 +301,15 @@ export function MemberTable({ data, loading, onRefresh, onNewMember, userRole }:
 
             <div className="border-t p-3">
               <div className="text-xs text-muted-foreground text-center">
-                {filteredData.length} {filteredData.length === 1 ? 'membro' : 'membros'} encontrado{filteredData.length !== 1 ? 's' : ''}
+                {filteredData.length} {filteredData.length === 1 ? 'protocolo' : 'protocolos'} encontrado{filteredData.length !== 1 ? 's' : ''}
               </div>
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Button size="sm" onClick={onNewMember} className="h-8 gap-2 cursor-pointer">
+        <Button size="sm" onClick={onNewProtocol} className="h-8 gap-2 cursor-pointer">
           <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Novo Membro</span>
+          <span className="hidden sm:inline">Novo Protocolo</span>
         </Button>
       </div>
 
@@ -285,43 +317,49 @@ export function MemberTable({ data, loading, onRefresh, onNewMember, userRole }:
       {filteredData.length === 0 ? (
         <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
           <div className="p-8 text-center">
-            <p className="text-muted-foreground">Nenhum membro encontrado.</p>
-            <p className="text-sm text-muted-foreground mt-2">Clique em "Novo Membro" para adicionar.</p>
+            <p className="text-muted-foreground">Nenhum protocolo encontrado.</p>
+            <p className="text-sm text-muted-foreground mt-2">Clique em &quot;Novo Protocolo&quot; para adicionar.</p>
           </div>
         </div>
       ) : (
         <>
           <div className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
             <div className="relative w-full overflow-x-auto">
-              <Table className="min-w-[800px]">
+              <Table className="min-w-[700px]">
                 <TableHeader>
                   <TableRow className="bg-muted hover:bg-muted border-b">
-                    <TableHead className="font-semibold">Nome</TableHead>
-                    <TableHead className="font-semibold">Cargo</TableHead>
-                    <TableHead className="font-semibold">CPF</TableHead>
-                    <TableHead className="font-semibold">Telefone</TableHead>
+                    <TableHead className="font-semibold">Número</TableHead>
+                    <TableHead className="font-semibold">Data Criação</TableHead>
+                    <TableHead className="font-semibold">Nº Processo</TableHead>
+                    <TableHead className="font-semibold">Apresentante</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="w-[70px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedData.map((member) => (
-                    <TableRow key={member.id} className="bg-white hover:bg-muted/40 min-h-[49px]">
-                      <TableCell className="font-medium">
-                        {member.name}
+                  {paginatedData.map((protocol) => (
+                    <TableRow key={protocol.id} className="bg-white hover:bg-muted/40 min-h-[49px]">
+                      <TableCell className="font-medium font-mono text-sm">
+                        {protocol.number}
                       </TableCell>
                       <TableCell>
-                        {member.role || '-'}
+                        <span className="text-sm text-muted-foreground">
+                          {format(new Date(protocol.createdAt), 'dd/MM/yyyy', { locale: ptBR })}
+                        </span>
                       </TableCell>
                       <TableCell>
-                        {member.cpf || '-'}
+                        <span className="font-mono text-sm">
+                          {protocol.processNumber}
+                        </span>
                       </TableCell>
                       <TableCell>
-                        {member.phone || '-'}
+                        <div className="max-w-[200px] truncate">
+                          {protocol.presenter}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={member.isActive ? 'default' : 'secondary'}>
-                          {member.isActive ? 'Ativo' : 'Inativo'}
+                        <Badge variant={statusVariants[protocol.status] || 'default'}>
+                          {statusLabels[protocol.status] || protocol.status}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -333,17 +371,28 @@ export function MemberTable({ data, loading, onRefresh, onNewMember, userRole }:
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => router.push(`/ccr/membros/${member.id}`)}
-                              className="cursor-pointer h-9"
-                            >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Editar
-                            </DropdownMenuItem>
-                            {canDelete && (
+                            {protocol.status === 'PENDENTE' && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={() => router.push(`/ccr/protocolos/${protocol.id}`)}
+                                  className="cursor-pointer h-9"
+                                >
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleConcludeClick(protocol.id, protocol.number)}
+                                  className="cursor-pointer h-9"
+                                >
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                  Concluir
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {canDelete && protocol.isLatest && (
                               <DropdownMenuItem
-                                onClick={() => handleDeleteClick(member.id, member.name)}
-                                disabled={deletingId === member.id}
+                                onClick={() => handleDeleteClick(protocol.id, protocol.number)}
+                                disabled={deletingId === protocol.id || !!protocol.resource}
                                 className="cursor-pointer h-9"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
@@ -460,12 +509,24 @@ export function MemberTable({ data, loading, onRefresh, onNewMember, userRole }:
       {/* Modal de Confirmação de Exclusão */}
       <DeleteModal
         isOpen={isDeleteModalOpen}
-        memberName={memberToDelete?.name || ''}
+        protocolNumber={protocolToDelete?.number || ''}
         onClose={() => {
           setIsDeleteModalOpen(false);
-          setMemberToDelete(null);
+          setProtocolToDelete(null);
         }}
         onConfirm={handleConfirmDelete}
+      />
+
+      {/* Modal de Conclusão */}
+      <ConcludeModal
+        isOpen={isConcludeModalOpen}
+        protocolNumber={protocolToConclude?.number || ''}
+        protocolId={protocolToConclude?.id || ''}
+        onClose={() => {
+          setIsConcludeModalOpen(false);
+          setProtocolToConclude(null);
+        }}
+        onConfirm={handleConfirmConclude}
       />
     </div>
   );
