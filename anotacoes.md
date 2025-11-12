@@ -17,4 +17,6 @@
 
 
 - permitir ou não alterar número do processo (admin; ver tabelas afetadas)
-- testar partes do processo
+
+
+- fazer status do protocolos na página de protocolos ter o mesmo padrão da página de tramitações

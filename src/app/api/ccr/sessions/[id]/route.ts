@@ -40,6 +40,11 @@ export async function GET(
             resource: {
               include: {
                 protocol: true,
+                registrations: {
+                  include: {
+                    values: true,
+                  },
+                },
               },
             },
             specificPresident: {
@@ -49,6 +54,22 @@ export async function GET(
                 role: true,
               },
             },
+            judgment: {
+              include: {
+                decision: true,
+              },
+            },
+            sessionVotingResults: {
+              include: {
+                decision: true,
+                winningMember: true,
+              },
+            },
+          },
+        },
+        members: {
+          include: {
+            member: true,
           },
         },
         minutes: {
@@ -80,6 +101,50 @@ export async function GET(
   }
 }
 
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    const { id } = await params;
+    const body = await req.json();
+
+    // PATCH permite atualização parcial
+    const updatedSession = await prismadb.session.update({
+      where: { id },
+      data: body,
+      include: {
+        president: true,
+        resources: {
+          include: {
+            resource: {
+              include: {
+                protocol: true,
+              },
+            },
+          },
+        },
+        members: {
+          include: {
+            member: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(updatedSession);
+  } catch (error) {
+    console.log('[SESSION_PATCH]', error);
+    return new NextResponse('Internal error', { status: 500 });
+  }
+}
+
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -101,6 +166,7 @@ export async function PUT(
       endTime,
       observations,
       status,
+      presidentId,
     } = body;
 
     if (!sessionNumber) {
@@ -116,7 +182,7 @@ export async function PUT(
     }
 
     // Validar tipo
-    const validTypes = ['ORDINARIA', 'EXTRAORDINARIA', 'SOLENE'];
+    const validTypes = ['ORDINARIA', 'EXTRAORDINARIA', 'OUTRO'];
 
     if (!validTypes.includes(type)) {
       return new NextResponse('Tipo de sessão inválido', { status: 400 });
@@ -129,6 +195,18 @@ export async function PUT(
       return new NextResponse('Status inválido', { status: 400 });
     }
 
+    // Extrair sequenceNumber e year do sessionNumber (formato: "XXXX/YYYY")
+    const sessionNumberMatch = sessionNumber.match(/^(\d{4})\/(\d{4})$/);
+    if (!sessionNumberMatch) {
+      return new NextResponse(
+        'Formato do número da sessão inválido. Use o formato XXXX/YYYY',
+        { status: 400 }
+      );
+    }
+
+    const sequenceNumber = parseInt(sessionNumberMatch[1], 10);
+    const year = parseInt(sessionNumberMatch[2], 10);
+
     // Verificar se a sessão existe
     const existingSession = await prismadb.session.findUnique({
       where: { id },
@@ -139,14 +217,10 @@ export async function PUT(
     }
 
     // Verificar se já existe outra sessão com o mesmo número no mesmo ano
-    const sessionYear = new Date(sessionDate).getFullYear();
     const duplicateSession = await prismadb.session.findFirst({
       where: {
-        sessionNumber,
-        date: {
-          gte: new Date(`${sessionYear}-01-01`),
-          lte: new Date(`${sessionYear}-12-31`),
-        },
+        sequenceNumber,
+        year,
         id: {
           not: id,
         },
@@ -155,10 +229,32 @@ export async function PUT(
 
     if (duplicateSession) {
       return new NextResponse(
-        `Já existe outra sessão com o número ${sessionNumber} no ano ${sessionYear}`,
+        `Já existe outra sessão com o número ${sessionNumber}`,
         { status: 400 }
       );
     }
+
+    // Se o tipo mudou, recalcular o ordinalNumber
+    let ordinalNumber = existingSession.ordinalNumber;
+    if (type !== existingSession.type) {
+      const lastSessionOfType = await prismadb.session.findFirst({
+        where: {
+          type: type as any,
+        },
+        orderBy: {
+          ordinalNumber: 'desc',
+        },
+        select: {
+          ordinalNumber: true,
+        },
+      });
+
+      ordinalNumber = lastSessionOfType ? lastSessionOfType.ordinalNumber + 1 : 1;
+    }
+
+    // Criar data no horário local (meio-dia UTC evita problemas de timezone)
+    const [year_date, month, day] = sessionDate.split('-');
+    const localDate = new Date(parseInt(year_date), parseInt(month) - 1, parseInt(day), 12, 0, 0);
 
     const updatedSession = await prismadb.session.update({
       where: {
@@ -166,14 +262,19 @@ export async function PUT(
       },
       data: {
         sessionNumber,
-        date: new Date(sessionDate),
+        sequenceNumber,
+        year,
+        ordinalNumber,
+        date: localDate,
         type,
         startTime: startTime || null,
         endTime: endTime || null,
         observations: observations || null,
         status: status || existingSession.status,
+        presidentId: presidentId || null,
       },
       include: {
+        president: true,
         createdByUser: {
           select: {
             id: true,

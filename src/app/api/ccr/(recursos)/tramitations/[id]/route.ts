@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prismadb from '@/lib/prismadb';
+import { canAccessTramitations, canEditTramitation, canDeleteTramitation } from '@/lib/permissions';
 
 export async function GET(
   req: Request,
@@ -10,8 +11,12 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (!session || !session.user) {
       return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    if (!canAccessTramitations(session.user.role)) {
+      return new NextResponse('Forbidden', { status: 403 });
     }
 
     const { id } = await params;
@@ -71,8 +76,12 @@ export async function PATCH(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (!session || !session.user) {
       return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    if (!canEditTramitation(session.user.role)) {
+      return new NextResponse('Forbidden', { status: 403 });
     }
 
     const { id } = await params;
@@ -143,8 +152,12 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (!session || !session.user) {
       return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    if (!canEditTramitation(session.user.role)) {
+      return new NextResponse('Forbidden', { status: 403 });
     }
 
     const { id } = await params;
@@ -252,13 +265,13 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (!session || !session.user) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Verificar se o usuário é admin
-    if (session.user.role !== 'ADMIN') {
-      return new NextResponse('Forbidden', { status: 403 });
+    // Verificar permissão
+    if (!canDeleteTramitation(session.user.role)) {
+      return new NextResponse('Você não tem permissão para excluir tramitações', { status: 403 });
     }
 
     const { id } = await params;
@@ -271,6 +284,11 @@ export async function DELETE(
 
     if (!tramitation) {
       return new NextResponse('Tramitação não encontrada', { status: 404 });
+    }
+
+    // Verificar se a tramitação está PENDENTE
+    if (tramitation.status !== 'PENDENTE') {
+      return new NextResponse('Apenas tramitações pendentes podem ser excluídas', { status: 403 });
     }
 
     // Hard delete - tramitações não têm dependências críticas

@@ -19,6 +19,7 @@ import {
   UserCircle,
   Contact,
   Plus,
+  Phone,
 } from 'lucide-react';
 
 export default function CCRLayout({ children }: { children: React.ReactNode }) {
@@ -147,6 +148,24 @@ export default function CCRLayout({ children }: { children: React.ReactNode }) {
           label: 'Nova Tramitação',
           icon: Plus,
           onClick: () => router.push('/ccr/tramitacoes/nova'),
+        });
+      }
+      // Se estiver na página de partes de um recurso
+      else if (pathname?.match(/^\/ccr\/recursos\/[^/]+\/partes$/)) {
+        const resourceId = pathname.split('/')[3];
+        customActions.push({
+          label: 'Gerenciar Contatos',
+          icon: Phone,
+          onClick: () => router.push(`/ccr/recursos/${resourceId}/contatos`),
+        });
+      }
+      // Se estiver na página de contatos de um recurso
+      else if (pathname?.match(/^\/ccr\/recursos\/[^/]+\/contatos$/)) {
+        const resourceId = pathname.split('/')[3];
+        customActions.push({
+          label: 'Gerenciar Partes',
+          icon: Users,
+          onClick: () => router.push(`/ccr/recursos/${resourceId}/partes`),
         });
       }
 

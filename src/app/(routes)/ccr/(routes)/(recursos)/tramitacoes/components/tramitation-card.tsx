@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Calendar, CheckCircle, User, Trash2 } from 'lucide-react';
+import { ArrowRight, Calendar, CheckCircle, User, X, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import Link from 'next/link';
 
 interface Tramitation {
@@ -63,16 +64,57 @@ const purposeLabels: Record<string, string> = {
 
 export function TramitationCard({ tramitation, onMarkAsReceived, onDelete, userRole }: TramitationCardProps) {
   const [loading, setLoading] = useState(false);
-  const canDelete = userRole === 'ADMIN';
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const canDelete = (userRole === 'ADMIN' || userRole === 'EMPLOYEE') && tramitation.status === 'PENDENTE';
 
   const handleMarkAsReceived = async () => {
     if (onMarkAsReceived) {
-      setLoading(true);
-      try {
-        await onMarkAsReceived(tramitation.id);
-      } finally {
-        setLoading(false);
-      }
+      setActionLoading('mark-received');
+
+      toast.warning('Tem certeza que deseja marcar esta tramitação como entregue?', {
+        duration: 10000,
+        action: {
+          label: 'Confirmar',
+          onClick: async () => {
+            setLoading(true);
+            try {
+              await onMarkAsReceived(tramitation.id);
+            } finally {
+              setLoading(false);
+              setActionLoading(null);
+            }
+          },
+        },
+        cancel: {
+          label: 'Cancelar',
+          onClick: () => {
+            setActionLoading(null);
+          },
+        },
+      });
+    }
+  };
+
+  const handleDelete = () => {
+    if (onDelete) {
+      setActionLoading('delete');
+
+      toast.warning('Tem certeza que deseja excluir esta tramitação?', {
+        duration: 10000,
+        action: {
+          label: 'Confirmar',
+          onClick: async () => {
+            await onDelete(tramitation.id, tramitation.processNumber);
+            setActionLoading(null);
+          },
+        },
+        cancel: {
+          label: 'Cancelar',
+          onClick: () => {
+            setActionLoading(null);
+          },
+        },
+      });
     }
   };
 
@@ -83,6 +125,9 @@ export function TramitationCard({ tramitation, onMarkAsReceived, onDelete, userR
     ? tramitation.member.name
     : tramitation.destination || 'Não especificado';
 
+  // Verificar se o fluxo deve ser invertido (quando está solicitando processo)
+  const isRequestingProcess = tramitation.purpose === 'SOLICITAR_PROCESSO';
+
   // Verificar se está vencida
   const isOverdue =
     tramitation.status === 'PENDENTE' &&
@@ -90,121 +135,170 @@ export function TramitationCard({ tramitation, onMarkAsReceived, onDelete, userR
     new Date(tramitation.deadline) < new Date();
 
   return (
-    <Card className="p-4">
-      <div className="space-y-3">
-        {/* Header com número do processo e ação/status */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+    <Card className="px-6 pt-4 pb-4">
+      {/* Header com número do processo e ação/status */}
+      <div className="flex items-start justify-between mb-1.5">
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-1">
             {tramitation.resource ? (
               <Link
                 href={`/ccr/recursos/${tramitation.resource.id}`}
-                className="text-lg font-bold text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                className="text-lg font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors"
               >
                 {tramitation.processNumber}
               </Link>
             ) : (
-              <span className="text-lg font-bold text-gray-900">
+              <h3 className="text-lg font-semibold text-gray-900">
                 {tramitation.processNumber}
-              </span>
+              </h3>
+            )}
+
+            {/* Status Badge */}
+            {tramitation.status === 'PENDENTE' ? (
+              <>
+                {isOverdue ? (
+                  <Badge variant="secondary" className="bg-red-100 text-red-800 flex items-center gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Vencida
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
+                    Pendente
+                  </Badge>
+                )}
+              </>
+            ) : (
+              <Badge variant="secondary" className="bg-green-100 text-green-800 flex items-center gap-1.5">
+                <CheckCircle className="h-3.5 w-3.5" />
+                Entregue
+              </Badge>
             )}
           </div>
 
-          {/* Status ou Ação */}
-          {tramitation.status === 'PENDENTE' ? (
-            <div className="flex items-center gap-2">
-              {isOverdue && (
-                <Badge className="text-xs font-semibold border bg-red-100 text-red-800 border-red-300 hover:bg-red-100">
-                  Vencida
-                </Badge>
-              )}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            {isRequestingProcess ? (
+              <>
+                <span className="font-medium">{destination}</span>
+                <ArrowRight className="h-4 w-4" />
+                <span className="font-medium">JURFIS</span>
+              </>
+            ) : (
+              <>
+                <span className="font-medium">JURFIS</span>
+                <ArrowRight className="h-4 w-4" />
+                <span className="font-medium">{destination}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Botões de Ação */}
+        <div className="flex gap-2">
+          {tramitation.status === 'PENDENTE' && (
+            <>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleMarkAsReceived}
-                disabled={loading}
+                disabled={loading || actionLoading !== null}
                 className="cursor-pointer"
               >
-                <CheckCircle className="h-4 w-4 mr-1.5" />
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Marcar Entregue
               </Button>
               {canDelete && onDelete && (
                 <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onDelete(tramitation.id, tramitation.processNumber)}
-                  className="cursor-pointer h-8 w-8 p-0"
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleDelete}
+                  disabled={actionLoading !== null}
+                  className="cursor-pointer h-8 w-8"
+                  title="Excluir tramitação"
                 >
-                  <Trash2 className="h-4 w-4 text-red-600" />
+                  {actionLoading === 'delete' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <X className="h-4 w-4" />
+                  )}
                 </Button>
               )}
-            </div>
-          ) : (
-            <Badge className="text-xs font-semibold border bg-green-100 text-green-800 border-green-300 hover:bg-green-100">
-              Entregue
-            </Badge>
+            </>
           )}
         </div>
+      </div>
 
-        {/* Fluxo: Origem → Destino */}
-        <div className="flex items-center gap-2 text-sm">
-          <div className="flex items-center gap-1 text-gray-600">
-            <Building2Icon className="h-4 w-4" />
-            <span className="font-medium">
-              {tramitation.sector?.abbreviation || 'JURFIS'}
-            </span>
-          </div>
-          <ArrowRight className="h-4 w-4 text-gray-400" />
-          <span className="font-medium text-gray-900">{destination}</span>
-        </div>
-
-        {/* Apresentante/Contribuinte */}
-        {tramitation.protocol?.presenter && (
-          <div className="flex items-center gap-1.5 text-sm text-gray-600">
-            <User className="h-4 w-4" />
-            <span>
-              <span className="font-medium">Apresentante:</span>{' '}
-              {tramitation.protocol.presenter}
-            </span>
-          </div>
-        )}
-
-        {/* Finalidade/Observações */}
-        {tramitation.observations && (
-          <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
+      {/* Observações */}
+      {tramitation.observations && (
+        <div className="mb-1.5">
+          <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg border">
             {tramitation.observations}
           </p>
-        )}
+        </div>
+      )}
 
-        {/* Informações adicionais (datas e responsável) */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="h-3.5 w-3.5" />
-            <span>
-              Enviado: {format(new Date(tramitation.requestDate), 'dd/MM/yyyy', { locale: ptBR })}
-            </span>
+      {/* Informações em Grid */}
+      <div className="grid grid-cols-4 gap-3 mb-1.5 mt-2">
+        {/* Finalidade */}
+        <div className="flex items-center gap-2 text-sm">
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <p className="text-xs text-muted-foreground">Finalidade</p>
+            <p className="font-medium text-xs truncate">{purposeLabels[tramitation.purpose] || tramitation.purpose}</p>
           </div>
-          {tramitation.deadline && (
-            <div className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5" />
-              <span className={cn(isOverdue && 'text-red-600 font-medium')}>
-                Prazo: {format(new Date(tramitation.deadline), 'dd/MM/yyyy', { locale: ptBR })}
-              </span>
+        </div>
+
+        {/* Enviado */}
+        <div className="flex items-center gap-2 text-sm">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <p className="text-xs text-muted-foreground">Enviado:</p>
+            <p className="font-medium text-xs">
+              {format(new Date(tramitation.requestDate), 'dd/MM/yyyy', { locale: ptBR })}
+            </p>
+          </div>
+        </div>
+
+        {/* Prazo ou Data de Entrega */}
+        {tramitation.status === 'ENTREGUE' && tramitation.returnDate ? (
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Entregue em:</p>
+              <p className="font-medium text-xs">
+                {format(new Date(tramitation.returnDate), 'dd/MM/yyyy', { locale: ptBR })}
+              </p>
             </div>
-          )}
-          {tramitation.status === 'ENTREGUE' && tramitation.returnDate && (
-            <div className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-green-600" />
-              <span className="text-green-600 font-medium">
-                Entregue em: {format(new Date(tramitation.returnDate), 'dd/MM/yyyy', { locale: ptBR })}
-              </span>
+          </div>
+        ) : tramitation.deadline ? (
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <p className="text-xs text-muted-foreground">Prazo:</p>
+              <p className={cn("font-medium text-xs", isOverdue && "text-red-600")}>
+                {format(new Date(tramitation.deadline), 'dd/MM/yyyy', { locale: ptBR })}
+              </p>
             </div>
-          )}
-          <div className="flex items-center gap-1">
-            <span>Por:</span>
-            <span className="font-medium">{tramitation.createdByUser.name}</span>
+          </div>
+        ) : null}
+
+        {/* Responsável */}
+        <div className="flex items-center gap-2 text-sm">
+          <User className="h-4 w-4 text-muted-foreground" />
+          <div>
+            <p className="text-xs text-muted-foreground">Responsável</p>
+            <p className="font-medium text-xs truncate">{tramitation.createdByUser.name}</p>
           </div>
         </div>
       </div>
+
+      {/* Apresentante */}
+      {tramitation.protocol?.presenter && (
+        <div className="border-t pt-1.5">
+          <p className="text-sm text-muted-foreground mb-1">Apresentante:</p>
+          <p className="text-sm font-medium">{tramitation.protocol.presenter}</p>
+        </div>
+      )}
     </Card>
   );
 }

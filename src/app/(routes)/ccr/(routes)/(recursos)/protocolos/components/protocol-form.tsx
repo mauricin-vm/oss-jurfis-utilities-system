@@ -212,6 +212,27 @@ export function ProtocolForm({ initialData }: ProtocolFormProps) {
     setParts(updated);
   };
 
+  const addContact = (partIndex: number) => {
+    const updated = [...parts];
+    updated[partIndex].contacts.push({
+      type: 'TELEFONE',
+      value: '',
+      isPrimary: false,
+    });
+    setParts(updated);
+  };
+
+  const removeContact = (partIndex: number, contactIndex: number) => {
+    const updated = [...parts];
+    // Garantir que sempre reste pelo menos um contato
+    if (updated[partIndex].contacts.length > 1) {
+      updated[partIndex].contacts = updated[partIndex].contacts.filter(
+        (_, i) => i !== contactIndex
+      );
+      setParts(updated);
+    }
+  };
+
   const onSubmit = async (data: ProtocolFormValues) => {
     try {
       // Validações
@@ -247,9 +268,19 @@ export function ProtocolForm({ initialData }: ProtocolFormProps) {
             return;
           }
 
-          if (!part.contacts[0] || !part.contacts[0].value || part.contacts[0].value.trim() === '') {
-            toast.error(`Contato da parte ${i + 1} é obrigatório`);
+          // Validar que pelo menos um contato foi preenchido
+          if (!part.contacts || part.contacts.length === 0) {
+            toast.error(`Pelo menos um contato da parte ${i + 1} é obrigatório`);
             return;
+          }
+
+          // Validar cada contato
+          for (let j = 0; j < part.contacts.length; j++) {
+            const contact = part.contacts[j];
+            if (!contact.value || contact.value.trim() === '') {
+              toast.error(`Contato ${j + 1} da parte ${i + 1} não pode estar vazio`);
+              return;
+            }
           }
         }
       }
@@ -267,16 +298,14 @@ export function ProtocolForm({ initialData }: ProtocolFormProps) {
         name: part.name,
         role: part.role,
         document: part.document || null,
-        contacts: [
-          {
-            ...part.contacts[0],
-            // Remover formatação do telefone antes de enviar
-            value:
-              part.contacts[0].type === 'TELEFONE'
-                ? part.contacts[0].value.replace(/\D/g, '')
-                : part.contacts[0].value,
-          },
-        ],
+        contacts: part.contacts.map((contact) => ({
+          ...contact,
+          // Remover formatação do telefone antes de enviar
+          value:
+            contact.type === 'TELEFONE'
+              ? contact.value.replace(/\D/g, '')
+              : contact.value,
+        })),
       }));
 
       const response = await fetch(url, {
@@ -424,91 +453,132 @@ export function ProtocolForm({ initialData }: ProtocolFormProps) {
             Adicione as partes envolvidas e seus respectivos contatos
           </p>
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {parts.map((part, partIndex) => (
-              <div key={partIndex} className="grid grid-cols-2 gap-3 items-start">
-                {/* Nome - ocupa metade da largura */}
-                <div>
-                  <Input
-                    placeholder="Nome da parte"
-                    value={part.name}
-                    onChange={(e) => updatePart(partIndex, 'name', e.target.value)}
-                    disabled={isConverted}
-                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
-                  />
-                </div>
-
-                {/* Segunda metade: Tipo, Tipo Contato, Campo Contato e Botão X */}
-                <div className="flex gap-2 items-center">
-                  {/* Tipo */}
-                  <div className="flex-1">
-                    <Select
-                      value={part.role}
-                      onValueChange={(value) => updatePart(partIndex, 'role', value)}
-                      disabled={isConverted}
-                    >
-                      <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
-                        <SelectValue placeholder="Tipo" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-lg">
-                        {roleOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Tipo de Contato */}
-                  <div className="flex-1">
-                    <Select
-                      value={part.contacts[0]?.type || 'TELEFONE'}
-                      onValueChange={(value) =>
-                        updateContact(partIndex, 0, 'type', value)
-                      }
-                      disabled={isConverted}
-                    >
-                      <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-lg">
-                        {contactTypeOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Campo de Contato */}
-                  <div className="flex-1">
+              <div key={partIndex} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                {/* Cabeçalho da Parte com Nome e Tipo */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5 text-gray-600">Nome da Parte</label>
                     <Input
-                      placeholder={
-                        part.contacts[0]?.type === 'EMAIL'
-                          ? 'email@exemplo.com'
-                          : '(00) 00000-0000'
-                      }
-                      value={part.contacts[0]?.value || ''}
-                      onChange={(e) =>
-                        updateContact(partIndex, 0, 'value', e.target.value)
-                      }
+                      placeholder="Nome da parte"
+                      value={part.name}
+                      onChange={(e) => updatePart(partIndex, 'name', e.target.value)}
                       disabled={isConverted}
                       className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     />
                   </div>
 
-                  {/* Botão Remover */}
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium mb-1.5 text-gray-600">Tipo</label>
+                      <Select
+                        value={part.role}
+                        onValueChange={(value) => updatePart(partIndex, 'role', value)}
+                        disabled={isConverted}
+                      >
+                        <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
+                          <SelectValue placeholder="Tipo" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-lg">
+                          {roleOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Botão Remover Parte */}
+                    {!isConverted && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removePart(partIndex)}
+                        className="shrink-0 cursor-pointer h-10"
+                        title="Remover parte"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Contatos da Parte */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-medium text-gray-600">Contatos</label>
+                  {part.contacts.map((contact, contactIndex) => (
+                    <div key={contactIndex} className="flex gap-2 items-center">
+                      <div className="grid grid-cols-2 gap-2 flex-1">
+                        {/* Tipo de Contato - ocupa 1/2 */}
+                        <div>
+                          <Select
+                            value={contact.type || 'TELEFONE'}
+                            onValueChange={(value) =>
+                              updateContact(partIndex, contactIndex, 'type', value)
+                            }
+                            disabled={isConverted}
+                          >
+                            <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-lg">
+                              {contactTypeOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Campo de Contato - ocupa 1/2 */}
+                        <div>
+                          <Input
+                            placeholder={
+                              contact.type === 'EMAIL'
+                                ? 'email@exemplo.com'
+                                : '(00) 00000-0000'
+                            }
+                            value={contact.value || ''}
+                            onChange={(e) =>
+                              updateContact(partIndex, contactIndex, 'value', e.target.value)
+                            }
+                            disabled={isConverted}
+                            className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Botão Remover Contato */}
+                      {!isConverted && part.contacts.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeContact(partIndex, contactIndex)}
+                          className="shrink-0 cursor-pointer"
+                          title="Remover contato"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Botão Adicionar Contato */}
                   {!isConverted && (
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removePart(partIndex)}
-                      className="shrink-0 cursor-pointer"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => addContact(partIndex)}
+                      className="w-full cursor-pointer mt-2"
                     >
-                      <X className="h-4 w-4" />
+                      <Plus className="mr-2 h-4 w-4" />
+                      Adicionar Contato
                     </Button>
                   )}
                 </div>

@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { CCRPageWrapper } from '../../components/ccr-page-wrapper';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { SessionForm } from '../components/session-form';
-import { Loader2, FileText, Users, Gavel } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
@@ -15,15 +17,30 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Calendar,
+  Clock,
+  Users,
+  FileText,
+  Play,
+  StopCircle,
+  Plus,
+  Trash2,
+  Loader2,
+  Gavel,
+} from 'lucide-react';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Button } from '@/components/ui/button';
-import { useRouter } from 'next/navigation';
+import { SessionForm } from '../components/session-form';
 
 interface Session {
   id: string;
-  sessionNumber: number;
-  sessionDate: Date;
+  sessionNumber: string;
+  sequenceNumber: number;
+  year: number;
+  ordinalNumber: number;
+  date: Date;
   type: string;
   startTime: string | null;
   endTime: string | null;
@@ -31,6 +48,7 @@ interface Session {
   agenda: string | null;
   observations: string | null;
   status: string;
+  presidentId: string | null;
   sessionResources: Array<{
     id: string;
     agendaOrder: number;
@@ -137,47 +155,35 @@ export default function VisualizarSessaoPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 space-y-4 p-8 pt-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold tracking-tight">Visualizar Sessão</h2>
-        </div>
+      <CCRPageWrapper title="Visualizar Sessão">
         <Card>
           <CardContent className="flex h-[400px] items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </CardContent>
         </Card>
-      </div>
+      </CCRPageWrapper>
     );
   }
 
   if (!session) {
     return (
-      <div className="flex-1 space-y-4 p-8 pt-6">
-        <div className="flex items-center justify-between">
-          <h2 className="text-3xl font-bold tracking-tight">Visualizar Sessão</h2>
-        </div>
+      <CCRPageWrapper title="Visualizar Sessão">
         <Card>
           <CardContent className="flex h-[400px] items-center justify-center">
             <p className="text-muted-foreground">Sessão não encontrada</p>
           </CardContent>
         </Card>
-      </div>
+      </CCRPageWrapper>
     );
   }
 
   return (
-    <div className="flex-1 space-y-4 p-8 pt-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">
-            Sessão {session.sessionNumber.toString().padStart(3, '0')}/
-            {new Date(session.sessionDate).getFullYear()}
-          </h2>
-          <p className="text-muted-foreground">
-            {format(new Date(session.sessionDate), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-          </p>
-        </div>
-        {session.status === 'AGENDADA' && (
+    <CCRPageWrapper
+      title={`Sessão ${session.sessionNumber}`}
+      description={format(new Date(session.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+    >
+      <div className="flex justify-end mb-4">
+        {session.status === 'PENDENTE' && (
           <Button onClick={() => router.push(`/ccr/sessoes/${session.id}/votacao`)}>
             <Gavel className="mr-2 h-4 w-4" />
             Iniciar Votação
@@ -359,6 +365,6 @@ export default function VisualizarSessaoPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </CCRPageWrapper>
   );
 }

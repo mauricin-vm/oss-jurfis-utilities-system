@@ -2,13 +2,18 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prismadb from '@/lib/prismadb';
+import { canAccessTramitations, canCreateTramitation } from '@/lib/permissions';
 
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (!session || !session.user) {
       return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    if (!canAccessTramitations(session.user.role)) {
+      return new NextResponse('Forbidden', { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -105,6 +110,10 @@ export async function POST(req: Request) {
 
     if (!session || !session.user?.id) {
       return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    if (!canCreateTramitation(session.user.role)) {
+      return new NextResponse('Forbidden', { status: 403 });
     }
 
     const body = await req.json();

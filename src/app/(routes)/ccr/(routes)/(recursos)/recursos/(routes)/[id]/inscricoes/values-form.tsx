@@ -68,10 +68,50 @@ const registrationTypeLabels: Record<string, string> = {
   CNPJ: 'CNPJ',
 };
 
+const brazilianStates = [
+  { value: 'AC', label: 'AC' },
+  { value: 'AL', label: 'AL' },
+  { value: 'AP', label: 'AP' },
+  { value: 'AM', label: 'AM' },
+  { value: 'BA', label: 'BA' },
+  { value: 'CE', label: 'CE' },
+  { value: 'DF', label: 'DF' },
+  { value: 'ES', label: 'ES' },
+  { value: 'GO', label: 'GO' },
+  { value: 'MA', label: 'MA' },
+  { value: 'MT', label: 'MT' },
+  { value: 'MS', label: 'MS' },
+  { value: 'MG', label: 'MG' },
+  { value: 'PA', label: 'PA' },
+  { value: 'PB', label: 'PB' },
+  { value: 'PR', label: 'PR' },
+  { value: 'PE', label: 'PE' },
+  { value: 'PI', label: 'PI' },
+  { value: 'RJ', label: 'RJ' },
+  { value: 'RN', label: 'RN' },
+  { value: 'RS', label: 'RS' },
+  { value: 'RO', label: 'RO' },
+  { value: 'RR', label: 'RR' },
+  { value: 'SC', label: 'SC' },
+  { value: 'SP', label: 'SP' },
+  { value: 'SE', label: 'SE' },
+  { value: 'TO', label: 'TO' },
+];
+
 export function ValuesForm({ initialData }: ValuesFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [expandedCards, setExpandedCards] = useState<number[]>([]);
+
+  // Função auxiliar para formatar moeda
+  const formatCurrency = (value: string) => {
+    const numericValue = value.replace(/\D/g, '');
+    if (!numericValue || numericValue === '') {
+      return '';
+    }
+    const number = parseFloat(numericValue) / 100;
+    return number.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   const [registrations, setRegistrations] = useState<Registration[]>(
     initialData.registrations.map((reg) => ({
@@ -88,8 +128,9 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
       values: reg.values.map((val) => ({
         id: val.id,
         description: val.description || '',
-        amount: val.amount.toString(),
-        dueDate: val.dueDate ? new Date(val.dueDate).toISOString().split('T')[0] : '',
+        // Converter valor do banco (reais) para centavos (string numérica) e aplicar máscara
+        amount: formatCurrency(Math.round(val.amount * 100).toString()),
+        dueDate: val.dueDate ? val.dueDate.toString().split('T')[0] : '',
       })),
     }))
   );
@@ -115,7 +156,7 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
         complement: '',
         neighborhood: '',
         city: '',
-        state: '',
+        state: 'MS',
         values: [],
       },
     ]);
@@ -157,15 +198,6 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
       [field]: value,
     };
     setRegistrations(updated);
-  };
-
-  const formatCurrency = (value: string) => {
-    const numericValue = value.replace(/\D/g, '');
-    if (!numericValue || numericValue === '') {
-      return '';
-    }
-    const number = parseFloat(numericValue) / 100;
-    return number.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   const parseCurrency = (value: string): number => {
@@ -282,7 +314,7 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
               id: val.id,
               description: val.description,
               amount: parseCurrency(val.amount),
-              dueDate: val.dueDate ? new Date(val.dueDate).toISOString() : null,
+              dueDate: val.dueDate ? new Date(val.dueDate + 'T12:00:00').toISOString() : null,
             })),
           })),
         }),
@@ -362,7 +394,7 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
               {isExpanded && (
                 <div className="px-4 pb-4 space-y-4 border-t">
                   {/* Linha 1: Tipo + Número + CEP + Rua */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mt-4">
                     <div className="space-y-0">
                       <Label className="block text-sm font-medium mb-1.5">Tipo de Inscrição <span className="text-red-500">*</span></Label>
                       <Select
@@ -389,7 +421,7 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
                         value={registration.registrationNumber}
                         onChange={(e) => updateRegistration(regIndex, 'registrationNumber', e.target.value)}
                         disabled={loading}
-                        placeholder="Ex: 12345678"
+                        placeholder="Número"
                         className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
@@ -415,27 +447,27 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
                       />
                     </div>
 
-                    <div className="space-y-0">
+                    <div className="space-y-0 md:col-span-3">
                       <Label className="block text-sm font-medium mb-1.5">Rua/Logradouro</Label>
                       <Input
                         value={registration.street}
                         onChange={(e) => updateRegistration(regIndex, 'street', e.target.value)}
                         disabled={loading}
-                        placeholder="Nome da rua"
+                        placeholder="Nome da rua, avenida, etc."
                         className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
                   </div>
 
                   {/* Linha 2: Número + Complemento + Bairro + Cidade + Estado */}
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                     <div className="space-y-0">
                       <Label className="block text-sm font-medium mb-1.5">Número</Label>
                       <Input
                         value={registration.number}
                         onChange={(e) => updateRegistration(regIndex, 'number', e.target.value)}
                         disabled={loading}
-                        placeholder="Nº"
+                        placeholder="Número"
                         className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
@@ -446,7 +478,7 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
                         value={registration.complement}
                         onChange={(e) => updateRegistration(regIndex, 'complement', e.target.value)}
                         disabled={loading}
-                        placeholder="Apto, Sala, etc"
+                        placeholder="Apto, sala, etc."
                         className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
@@ -457,32 +489,40 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
                         value={registration.neighborhood}
                         onChange={(e) => updateRegistration(regIndex, 'neighborhood', e.target.value)}
                         disabled={loading}
-                        placeholder="Nome do bairro"
+                        placeholder="Bairro"
                         className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
 
-                    <div className="space-y-0">
+                    <div className="space-y-0 md:col-span-2">
                       <Label className="block text-sm font-medium mb-1.5">Cidade</Label>
                       <Input
                         value={registration.city}
                         onChange={(e) => updateRegistration(regIndex, 'city', e.target.value)}
                         disabled={loading}
-                        placeholder="Nome da cidade"
+                        placeholder="Cidade"
                         className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                       />
                     </div>
 
                     <div className="space-y-0">
                       <Label className="block text-sm font-medium mb-1.5">Estado (UF)</Label>
-                      <Input
+                      <Select
                         value={registration.state}
-                        onChange={(e) => updateRegistration(regIndex, 'state', e.target.value)}
+                        onValueChange={(value) => updateRegistration(regIndex, 'state', value)}
                         disabled={loading}
-                        placeholder="MS"
-                        maxLength={2}
-                        className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
-                      />
+                      >
+                        <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
+                          <SelectValue placeholder="UF" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-lg">
+                          {brazilianStates.map((state) => (
+                            <SelectItem key={state.value} value={state.value}>
+                              {state.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 

@@ -120,7 +120,7 @@ export default function RecursoDetalhesPage() {
     return (
       <CCRPageWrapper title={<Skeleton className="h-8 w-96" />} breadcrumbs={breadcrumbs}>
         <div className="space-y-6">
-          <Tabs defaultValue="geral" className="w-full flex flex-col focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:ring-0 focus-visible:ring-0">
+          <Tabs defaultValue="geral" className="w-full flex flex-col focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">
             <TabsList className="grid w-full grid-cols-5 bg-muted h-8 p-px">
               <TabsTrigger value="geral" className="cursor-pointer text-xs h-7 px-2 select-none">Geral</TabsTrigger>
               <TabsTrigger value="tramitacoes" className="cursor-pointer text-xs h-7 px-2 select-none">Tramitações</TabsTrigger>
@@ -219,7 +219,7 @@ export default function RecursoDetalhesPage() {
   return (
     <CCRPageWrapper title={pageTitle} breadcrumbs={breadcrumbs}>
       <div className="space-y-6">
-        <Tabs defaultValue="geral" className="w-full flex flex-col focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0 focus:ring-0 focus-visible:ring-0">
+        <Tabs defaultValue="geral" className="w-full flex flex-col focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">
           <TabsList className="grid w-full grid-cols-5 bg-muted h-8 p-px">
             <TabsTrigger value="geral" className="cursor-pointer text-xs h-7 px-2 select-none">Geral</TabsTrigger>
             <TabsTrigger value="tramitacoes" className="cursor-pointer text-xs h-7 px-2 select-none">Tramitações</TabsTrigger>
@@ -522,7 +522,19 @@ export default function RecursoDetalhesPage() {
             <div className="bg-white rounded-lg border p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="font-semibold">Inscrições</h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-semibold">Inscrições</h3>
+                    {resource.registrations && resource.registrations.length > 0 && (
+                      <span className="text-xs text-gray-700 bg-green-50 px-2 py-1 rounded font-medium">
+                        Total: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                          resource.registrations.reduce((total: number, reg: any) => {
+                            const regTotal = reg.values?.reduce((acc: number, v: any) => acc + Number(v.amount), 0) || 0;
+                            return total + regTotal;
+                          }, 0)
+                        )}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground mt-1.5">Inscrições e débitos relacionados ao processo</p>
                 </div>
                 <Button
@@ -561,7 +573,7 @@ export default function RecursoDetalhesPage() {
                                   <span className="text-gray-700 font-medium">{value.description || 'Valor'}</span>
                                   {value.dueDate && (
                                     <span className="text-xs text-gray-500 ml-2">
-                                      (Venc: {new Date(value.dueDate).toLocaleDateString('pt-BR')})
+                                      (Venc: {new Date(value.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })})
                                     </span>
                                   )}
                                 </div>
@@ -588,7 +600,7 @@ export default function RecursoDetalhesPage() {
                     <div className="text-center">
                       <p className="text-sm text-muted-foreground">Nenhuma inscrição cadastrada</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Clique em "Editar Registro" para adicionar
+                        Clique em "Editar" para adicionar
                       </p>
                     </div>
                   </div>

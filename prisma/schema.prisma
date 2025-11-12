@@ -205,6 +205,7 @@ model Contact {
   // Marcadores
   isPrimary   Boolean  @default(false) // Contato principal da parte
   isVerified  Boolean  @default(false) // Contato verificado
+  isActive    Boolean  @default(true)  // Contato ativo (soft delete)
 
   // Auditoria
   createdBy   String?
@@ -461,6 +462,7 @@ model Resource {
   subjects          SubjectChildren[] // Assuntos do recurso (many-to-many com hierarquia)
   registrations     Registration[] // Inscrições e valores do recurso
   authorities       Authority[] // Autoridades vinculadas ao recurso
+  addresses         Address[] // Endereços vinculados ao recurso
   sessions          SessionResource[]
   distributions     SessionDistribution[]
   documents         Document[]
@@ -580,33 +582,39 @@ model Authority {
 // 4. MÓDULO DE SESSÕES
 // ============================================
 model Session {
-  id            String   @id @default(uuid())
-  sessionNumber String   @unique // Número da sessão
-  date          DateTime
-  startTime     String   // Formato: "14:00"
-  endTime       String?  // Formato: "17:00"
-  type          SessionType // ORDINARIA, EXTRAORDINARIA
-  status        SessionStatus @default(PENDENTE)
+  id             String   @id @default(uuid())
+  sessionNumber  String   @unique // "XXXX/YYYY"
+  sequenceNumber Int      // XXXX
+  year           Int      // YYYY
+  ordinalNumber  Int      // Número sequencial contínuo por tipo (não reseta anualmente)
+
+  date           DateTime
+  startTime      String?  // Formato: "14:00"
+  endTime        String?  // Formato: "17:00"
+  type           SessionType // ORDINARIA, EXTRAORDINARIA
+  status         SessionStatus @default(PENDENTE)
 
   // Presidente da sessão (membro conselheiro)
-  presidentId   String
-  president     Member @relation("SessionPresident", fields: [presidentId], references: [id])
+  presidentId    String?
+  president      Member? @relation("SessionPresident", fields: [presidentId], references: [id])
 
-  observations  String?  @db.Text
+  observations   String?  @db.Text
 
-  resources     SessionResource[]
-  members       SessionMember[] // Membros presentes na sessão
-  distributions SessionDistribution[] @relation("DistributionsSessions")
-  minutes       SessionMinutes? // Ata da sessão (gerada após a sessão)
+  resources      SessionResource[]
+  members        SessionMember[] // Membros presentes na sessão
+  distributions  SessionDistribution[] @relation("DistributionsSessions")
+  minutes        SessionMinutes? // Ata da sessão (gerada após a sessão)
 
-  createdBy     String
-  createdByUser User @relation("SessionCreatedBy", fields: [createdBy], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdBy      String
+  createdByUser  User @relation("SessionCreatedBy", fields: [createdBy], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([date])
   @@index([status])
   @@index([presidentId])
+  @@index([year, sequenceNumber])
+  @@index([type, ordinalNumber])
   @@map("CCR_Session")
   @@schema("jurfis")
 }
@@ -1075,6 +1083,35 @@ model ResourceHistory {
 }
 
 // ============================================
+// ENDEREÇOS
+// ============================================
+model Address {
+  id            String   @id @default(uuid())
+  resourceId    String
+  resource      Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  type          AddressType
+  cep           String?
+  street        String   // Rua/Logradouro
+  number        String?  // Número
+  complement    String?  // Complemento
+  neighborhood  String?  // Bairro
+  city          String   // Cidade
+  state         String   // Estado (UF)
+
+  isPrimary     Boolean  @default(false)
+  isActive      Boolean  @default(true)  // Endereço ativo (soft delete)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([resourceId])
+  @@index([type])
+  @@map("CCR_Address")
+  @@schema("jurfis")
+}
+
+// ============================================
 // ENUMS
 // ============================================
 enum ProtocolStatus {
@@ -1095,6 +1132,13 @@ enum PartRole {
 enum ContactType {
   TELEFONE
   EMAIL
+  @@schema("jurfis")
+}
+
+enum AddressType {
+  CORRESPONDENCIA
+  RECURSO
+  OUTRO
   @@schema("jurfis")
 }
 
@@ -1157,6 +1201,7 @@ enum AuthorityType {
 enum SessionType {
   ORDINARIA
   EXTRAORDINARIA
+  OUTRO
   @@schema("jurfis")
 }
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prismadb from '@/lib/prismadb';
+import { canEditRegistrations } from '@/lib/permissions';
 
 export async function PATCH(
   req: Request,
@@ -10,8 +11,12 @@ export async function PATCH(
   try {
     const session = await getServerSession(authOptions);
 
-    if (!session) {
+    if (!session || !session.user) {
       return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    if (!canEditRegistrations(session.user.role)) {
+      return new NextResponse('Forbidden', { status: 403 });
     }
 
     const { id } = await params;

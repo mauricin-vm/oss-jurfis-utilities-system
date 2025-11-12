@@ -136,7 +136,46 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
     ]);
   };
 
-  const removePart = (index: number) => {
+  const removePart = async (index: number) => {
+    const part = parts[index];
+
+    // Se a parte tem ID (já existe no banco), verificar se tem contatos
+    if (part.id) {
+      try {
+        // Buscar contatos da parte
+        const response = await fetch(`/api/ccr/parts/${part.id}/contacts`);
+        if (response.ok) {
+          const contacts = await response.json();
+
+          if (contacts.length > 0) {
+            // Mostrar confirmação
+            const message = contacts.length === 1
+              ? 'Esta parte possui 1 contato vinculado. Deseja realmente excluir?'
+              : `Esta parte possui ${contacts.length} contatos vinculados. Deseja realmente excluir?`;
+
+            toast.warning(message, {
+              duration: 10000,
+              action: {
+                label: 'Confirmar',
+                onClick: () => {
+                  setParts(parts.filter((_, i) => i !== index));
+                  toast.success('Parte removida com sucesso');
+                },
+              },
+              cancel: {
+                label: 'Cancelar',
+                onClick: () => {},
+              },
+            });
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking contacts:', error);
+      }
+    }
+
+    // Se não tem ID ou não tem contatos, pode remover direto
     setParts(parts.filter((_, i) => i !== index));
   };
 

@@ -1,15 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -26,61 +23,128 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const formSchema = z.object({
-  sessionNumber: z.string().min(1, 'Número da sessão é obrigatório'),
-  sessionDate: z.string().min(1, 'Data da sessão é obrigatória'),
-  type: z.string().min(1, 'Tipo de sessão é obrigatório'),
-  startTime: z.string().optional(),
-  endTime: z.string().optional(),
-  location: z.string().optional(),
-  agenda: z.string().optional(),
-  observations: z.string().optional(),
-  status: z.string().optional(),
-});
-
-type SessionFormValues = z.infer<typeof formSchema>;
+type SessionFormValues = {
+  sessionNumber: string;
+  date: string;
+  startTime?: string;
+  endTime?: string;
+  type: string;
+  presidentId?: string;
+  observations?: string;
+};
 
 interface SessionFormProps {
   initialData?: any;
 }
 
 const typeOptions = [
-  { value: 'ORDINARIA', label: 'Ordinária' },
   { value: 'EXTRAORDINARIA', label: 'Extraordinária' },
-  { value: 'SOLENE', label: 'Solene' },
-];
-
-const statusOptions = [
-  { value: 'AGENDADA', label: 'Agendada' },
-  { value: 'EM_ANDAMENTO', label: 'Em Andamento' },
-  { value: 'FINALIZADA', label: 'Finalizada' },
-  { value: 'CANCELADA', label: 'Cancelada' },
+  { value: 'ORDINARIA', label: 'Ordinária' },
+  { value: 'OUTRO', label: 'Outro' },
 ];
 
 export function SessionForm({ initialData }: SessionFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [members, setMembers] = useState<any[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [loadingNextNumber, setLoadingNextNumber] = useState(false);
 
   const form = useForm<SessionFormValues>({
-    resolver: zodResolver(formSchema),
     defaultValues: {
-      sessionNumber: initialData?.sessionNumber?.toString() || '',
-      sessionDate: initialData?.sessionDate
-        ? new Date(initialData.sessionDate).toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0],
+      sessionNumber: initialData?.sessionNumber || '',
+      date: initialData?.date
+        ? new Date(initialData.date).toISOString().split('T')[0]
+        : '',
+      startTime: initialData?.startTime || '08:00',
+      endTime: initialData?.endTime || '11:00',
       type: initialData?.type || '',
-      startTime: initialData?.startTime || '',
-      endTime: initialData?.endTime || '',
-      location: initialData?.location || '',
-      agenda: initialData?.agenda || '',
+      presidentId: initialData?.presidentId || '',
       observations: initialData?.observations || '',
-      status: initialData?.status || 'AGENDADA',
     },
   });
 
+  // Buscar próximo número de sessão
+  useEffect(() => {
+    const fetchNextSessionNumber = async () => {
+      // Só buscar se não houver initialData (criação de nova sessão)
+      if (initialData) return;
+
+      try {
+        setLoadingNextNumber(true);
+        const currentYear = new Date().getFullYear();
+        const response = await fetch(`/api/ccr/sessions?year=${currentYear}`);
+
+        if (response.ok) {
+          const sessions = await response.json();
+
+          if (sessions.length > 0) {
+            // Usar o campo sequenceNumber diretamente
+            const maxSequenceNumber = Math.max(...sessions.map((s: any) => s.sequenceNumber));
+            const nextSequence = maxSequenceNumber + 1;
+            const nextNumber = nextSequence.toString().padStart(4, '0');
+            form.setValue('sessionNumber', `${nextNumber}/${currentYear}`);
+          } else {
+            // Primeira sessão do ano
+            form.setValue('sessionNumber', `0001/${currentYear}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching next session number:', error);
+        // Não mostrar erro ao usuário, apenas deixar o campo vazio
+      } finally {
+        setLoadingNextNumber(false);
+      }
+    };
+
+    fetchNextSessionNumber();
+  }, [initialData, form]);
+
+  // Buscar membros conselheiros ativos
+  useEffect(() => {
+    const fetchMembers = async () => {
+      try {
+        setLoadingMembers(true);
+        const response = await fetch('/api/ccr/members');
+        if (response.ok) {
+          const data = await response.json();
+          // Filtrar apenas membros ativos
+          const activeMembers = data.filter((m: any) => m.isActive === true);
+          setMembers(activeMembers);
+        } else {
+          toast.error('Erro ao carregar membros');
+        }
+      } catch (error) {
+        console.error('Error fetching members:', error);
+        toast.error('Erro ao carregar membros');
+      } finally {
+        setLoadingMembers(false);
+      }
+    };
+
+    fetchMembers();
+  }, []);
+
   const onSubmit = async (data: SessionFormValues) => {
     try {
+      // Validações
+      if (!data.sessionNumber || data.sessionNumber.trim() === '') {
+        toast.error('Número da sessão é obrigatório');
+        return;
+      }
+
+      if (!data.date || data.date.trim() === '') {
+        toast.error('Data da sessão é obrigatória');
+        return;
+      }
+
+      if (!data.type) {
+        toast.error('Tipo de sessão é obrigatório');
+        return;
+      }
+
       setLoading(true);
 
       const url = initialData?.id
@@ -93,13 +157,13 @@ export function SessionForm({ initialData }: SessionFormProps) {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...data,
-          sessionNumber: parseInt(data.sessionNumber),
-          startTime: data.startTime || null,
-          endTime: data.endTime || null,
-          location: data.location || null,
-          agenda: data.agenda || null,
-          observations: data.observations || null,
+          sessionNumber: data.sessionNumber.trim(),
+          sessionDate: data.date,
+          startTime: data.startTime?.trim() || null,
+          endTime: data.endTime?.trim() || null,
+          type: data.type,
+          presidentId: data.presidentId || null,
+          observations: data.observations?.trim() || null,
         }),
       });
 
@@ -108,7 +172,9 @@ export function SessionForm({ initialData }: SessionFormProps) {
         throw new Error(error);
       }
 
-      toast.success(initialData?.id ? 'Sessão atualizada' : 'Sessão criada');
+      toast.success(
+        initialData?.id ? 'Sessão atualizada com sucesso' : 'Sessão criada com sucesso'
+      );
       router.push('/ccr/sessoes');
       router.refresh();
     } catch (error) {
@@ -119,22 +185,70 @@ export function SessionForm({ initialData }: SessionFormProps) {
     }
   };
 
+  // Mostrar skeleton enquanto carrega os dados
+  if (loadingMembers) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+        <div className="flex justify-end gap-4">
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2">
+        {/* Linha 1: Número, Data e Tipo */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FormField
             control={form.control}
             name="sessionNumber"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Número da Sessão *</FormLabel>
+              <FormItem className="space-y-0">
+                <FormLabel className="block text-sm font-medium mb-1.5">
+                  Número da Sessão <span className="text-red-500">*</span>
+                </FormLabel>
                 <FormControl>
-                  <Input type="number" placeholder="1" {...field} />
+                  <Input
+                    placeholder="Ex: 0001/2025"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    {...field}
+                  />
                 </FormControl>
-                <FormDescription>
-                  Número sequencial da sessão no ano
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -142,33 +256,42 @@ export function SessionForm({ initialData }: SessionFormProps) {
 
           <FormField
             control={form.control}
-            name="sessionDate"
+            name="date"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Data da Sessão *</FormLabel>
+              <FormItem className="space-y-0">
+                <FormLabel className="block text-sm font-medium mb-1.5">
+                  Data da Sessão <span className="text-red-500">*</span>
+                </FormLabel>
                 <FormControl>
-                  <Input type="date" {...field} />
+                  <Input
+                    type="date"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
-        </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
           <FormField
             control={form.control}
             name="type"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo de Sessão *</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <FormItem className="space-y-0">
+                <FormLabel className="block text-sm font-medium mb-1.5">
+                  Tipo de Sessão <span className="text-red-500">*</span>
+                </FormLabel>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                >
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
                       <SelectValue placeholder="Selecione o tipo" />
                     </SelectTrigger>
                   </FormControl>
-                  <SelectContent>
+                  <SelectContent className="rounded-lg">
                     {typeOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
@@ -180,44 +303,24 @@ export function SessionForm({ initialData }: SessionFormProps) {
               </FormItem>
             )}
           />
-
-          {initialData?.id && (
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {statusOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+        {/* Linha 2: Horário Início, Horário Término e Presidente */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FormField
             control={form.control}
             name="startTime"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Horário de Início</FormLabel>
+              <FormItem className="space-y-0">
+                <FormLabel className="block text-sm font-medium mb-1.5">
+                  Horário de Início
+                </FormLabel>
                 <FormControl>
-                  <Input type="time" {...field} />
+                  <Input
+                    type="time"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -228,10 +331,16 @@ export function SessionForm({ initialData }: SessionFormProps) {
             control={form.control}
             name="endTime"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Horário de Término</FormLabel>
+              <FormItem className="space-y-0">
+                <FormLabel className="block text-sm font-medium mb-1.5">
+                  Horário de Término
+                </FormLabel>
                 <FormControl>
-                  <Input type="time" {...field} />
+                  <Input
+                    type="time"
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                    {...field}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -240,50 +349,50 @@ export function SessionForm({ initialData }: SessionFormProps) {
 
           <FormField
             control={form.control}
-            name="location"
+            name="presidentId"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Local</FormLabel>
-                <FormControl>
-                  <Input placeholder="Ex: Sala de Reuniões" {...field} />
-                </FormControl>
+              <FormItem className="space-y-0">
+                <FormLabel className="block text-sm font-medium mb-1.5">
+                  Presidente da Sessão
+                </FormLabel>
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  disabled={loadingMembers}
+                >
+                  <FormControl>
+                    <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
+                      <SelectValue placeholder={loadingMembers ? "Carregando..." : "Selecione o presidente"} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent className="rounded-lg">
+                    {members.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
 
-        <FormField
-          control={form.control}
-          name="agenda"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Pauta</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Descreva a pauta da sessão"
-                  rows={4}
-                  {...field}
-                />
-              </FormControl>
-              <FormDescription>
-                Principais assuntos a serem tratados na sessão
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
+        {/* Observações */}
         <FormField
           control={form.control}
           name="observations"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Observações</FormLabel>
+            <FormItem className="space-y-0">
+              <FormLabel className="block text-sm font-medium mb-1.5">
+                Observações
+              </FormLabel>
               <FormControl>
                 <Textarea
                   placeholder="Observações gerais sobre a sessão"
-                  rows={3}
+                  rows={4}
+                  className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 resize-none"
                   {...field}
                 />
               </FormControl>
@@ -292,16 +401,18 @@ export function SessionForm({ initialData }: SessionFormProps) {
           )}
         />
 
-        <div className="flex justify-end gap-4">
+        {/* Botões */}
+        <div className="flex justify-end gap-4 pt-4">
           <Button
             type="button"
             variant="outline"
             onClick={() => router.push('/ccr/sessoes')}
             disabled={loading}
+            className="cursor-pointer"
           >
             Cancelar
           </Button>
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading || loadingMembers} className="cursor-pointer">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {initialData?.id ? 'Atualizar' : 'Criar'} Sessão
           </Button>
