@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Info } from 'lucide-react';
+import { Info, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useApi } from '@/hooks/use-api';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 import { MeetingRequestFormData } from '../types';
 import { formatPhoneForDisplay, formatPhoneToRaw, formatPhoneToDatabase } from '@/lib/validations';
 
@@ -227,7 +228,12 @@ export function RequestModal({ isOpen, onClose, onSuccess }: RequestModalProps) 
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Novo Agendamento</h2>
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                Novo Agendamento
+                <TooltipWrapper content="Agendamento sujeito à aprovação. Você receberá um email confirmando ou rejeitando sua solicitação.">
+                  <HelpCircle className="h-5 w-5 text-gray-400 cursor-help" />
+                </TooltipWrapper>
+              </h2>
               <p className="text-sm text-gray-600 mt-1">Solicite o agendamento da Sala Alberto Kalachi (CAC, 4° andar, sala 4)</p>
             </div>
             <button

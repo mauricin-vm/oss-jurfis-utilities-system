@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Plus, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
+import { Plus, X, Loader2, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Address {
@@ -130,6 +131,14 @@ export default function EnderecosPage() {
     ]);
     // Expandir automaticamente o novo card
     setExpandedCards([...expandedCards, newIndex]);
+  };
+
+  const removeNewAddress = (index: number) => {
+    const updated = addresses.filter((_, i) => i !== index);
+    setAddresses(updated);
+    // Atualizar índices dos cards expandidos
+    setExpandedCards(expandedCards.filter(i => i !== index).map(i => i > index ? i - 1 : i));
+    toast.success('Endereço removido');
   };
 
   const updateAddress = (
@@ -308,7 +317,7 @@ export default function EnderecosPage() {
 
       if (response.ok) {
         toast.success('Endereços atualizados com sucesso');
-        await fetchResource();
+        router.push(`/ccr/recursos/${params.id}`);
       } else {
         const error = await response.text();
         throw new Error(error);
@@ -463,39 +472,57 @@ export default function EnderecosPage() {
                         </div>
 
                         {/* Botões de Ação */}
-                        {!address.isNew && (
-                          <div className="flex gap-2 items-center shrink-0" onClick={(e) => e.stopPropagation()}>
-                            {/* Switch Ativar/Desativar */}
-                            {canToggle && (
-                              <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={address.isActive}
-                                  onCheckedChange={() => handleToggleActive(address.id!, addressLabel, address.isActive)}
-                                  disabled={actionLoading === address.id}
-                                />
-                              </div>
-                            )}
-
-                            {/* Botão Excluir (apenas ADMIN) */}
-                            {isAdmin && (
+                        <div className="flex gap-2 items-center shrink-0" onClick={(e) => e.stopPropagation()}>
+                          {address.isNew ? (
+                            // Botão Remover para endereços novos (não salvos)
+                            <TooltipWrapper content="Remover endereço">
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleDelete(address.id!, addressLabel)}
-                                disabled={actionLoading === address.id}
+                                onClick={() => removeNewAddress(index)}
                                 className="cursor-pointer"
-                                title="Excluir permanentemente"
                               >
-                                {actionLoading === address.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <X className="h-4 w-4" />
-                                )}
+                                <X className="h-4 w-4" />
                               </Button>
-                            )}
-                          </div>
-                        )}
+                            </TooltipWrapper>
+                          ) : (
+                            <>
+                              {/* Switch Ativar/Desativar */}
+                              {canToggle && (
+                                <TooltipWrapper content={address.isActive ? "Desativar endereço" : "Ativar endereço"}>
+                                  <div className="flex items-center gap-2">
+                                    <Switch
+                                      checked={address.isActive}
+                                      onCheckedChange={() => handleToggleActive(address.id!, addressLabel, address.isActive)}
+                                      disabled={actionLoading === address.id}
+                                    />
+                                  </div>
+                                </TooltipWrapper>
+                              )}
+
+                              {/* Botão Excluir (apenas ADMIN) */}
+                              {isAdmin && (
+                                <TooltipWrapper content="Excluir endereço">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDelete(address.id!, addressLabel)}
+                                    disabled={actionLoading === address.id}
+                                    className="cursor-pointer"
+                                  >
+                                    {actionLoading === address.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <X className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </TooltipWrapper>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
 
                       {/* Conteúdo do Card - Expansível */}
@@ -528,8 +555,11 @@ export default function EnderecosPage() {
 
                             {/* CEP */}
                             <div>
-                              <label className="block text-sm font-medium mb-1.5 text-gray-700">
+                              <label className="block text-sm font-medium mb-1.5 text-gray-700 flex items-center gap-1.5">
                                 CEP
+                                <TooltipWrapper content="Preencha o CEP e aperte a tecla TAB">
+                                  <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                                </TooltipWrapper>
                               </label>
                               <Input
                                 placeholder="00000-000"

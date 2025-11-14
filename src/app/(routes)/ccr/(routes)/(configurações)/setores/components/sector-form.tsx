@@ -16,7 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, HelpCircle } from 'lucide-react';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 
 type SectorFormValues = {
   name: string;
@@ -129,7 +130,7 @@ export function SectorForm({ initialData }: SectorFormProps) {
               </FormLabel>
               <FormControl>
                 <Input
-                  placeholder="Ex: Fiscalização"
+                  placeholder="Gerência de Exemplo (ABREV/ÓRGÃO)"
                   className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                   {...field}
                 />
@@ -147,7 +148,7 @@ export function SectorForm({ initialData }: SectorFormProps) {
                 <FormLabel className="block text-sm font-medium mb-1.5">Abreviação</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="Ex: FISC"
+                    placeholder="ABREV/ÓRGÃO"
                     className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     {...field}
                   />
@@ -164,7 +165,7 @@ export function SectorForm({ initialData }: SectorFormProps) {
                 <FormLabel className="block text-sm font-medium mb-1.5">Código de Despacho</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="Ex: FIS-001"
+                    placeholder="0000000000"
                     className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                     {...field}
                   />
@@ -218,7 +219,12 @@ export function SectorForm({ initialData }: SectorFormProps) {
             name="email"
             render={({ field }) => (
               <FormItem className="space-y-0">
-                <FormLabel className="block text-sm font-medium mb-1.5">Email</FormLabel>
+                <FormLabel className="block text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                  Email
+                  <TooltipWrapper content="Preencha o email para solicitar processos desse setor">
+                    <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  </TooltipWrapper>
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="email"

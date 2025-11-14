@@ -42,7 +42,7 @@ export default function NovaTramitacaoPage() {
         <CardHeader>
           <CardTitle>Cadastrar Tramitação</CardTitle>
           <CardDescription>
-            Preencha as informações da nova tramitação. O registro será criado com status pendente.
+            Preencha as informações da nova tramitação.
           </CardDescription>
         </CardHeader>
         <CardContent>

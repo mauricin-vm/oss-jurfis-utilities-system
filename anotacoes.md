@@ -20,3 +20,6 @@
 
 
 - fazer status do protocolos na página de protocolos ter o mesmo padrão da página de tramitações
+
+
+- verificações: padrão de cores e estrutura; espaçamento; input e select (borda, ring e accent); skeleton; tooltip

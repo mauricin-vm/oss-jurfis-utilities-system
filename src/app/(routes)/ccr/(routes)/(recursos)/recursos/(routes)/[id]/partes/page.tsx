@@ -33,24 +33,36 @@ export default function EditarPartesPage() {
   const router = useRouter();
   const params = useParams();
   const [resource, setResource] = useState<Resource | null>(null);
+  const [registeredAuthorities, setRegisteredAuthorities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (params.id) {
-      fetchResource();
+      fetchData();
     }
   }, [params.id]);
 
-  const fetchResource = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/ccr/resources/${params.id}`);
-      if (response.ok) {
-        const data = await response.json();
+
+      // Buscar recurso e autoridades em paralelo
+      const [resourceResponse, authoritiesResponse] = await Promise.all([
+        fetch(`/api/ccr/resources/${params.id}`),
+        fetch('/api/ccr/authorities-registered')
+      ]);
+
+      if (resourceResponse.ok) {
+        const data = await resourceResponse.json();
         setResource(data);
       }
+
+      if (authoritiesResponse.ok) {
+        const authoritiesData = await authoritiesResponse.json();
+        setRegisteredAuthorities(authoritiesData);
+      }
     } catch (error) {
-      console.error('Error fetching resource:', error);
+      console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
@@ -168,7 +180,7 @@ export default function EditarPartesPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <AuthoritiesForm initialData={resource} />
+          <AuthoritiesForm initialData={resource} registeredAuthorities={registeredAuthorities} />
         </CardContent>
       </Card>
     </CCRPageWrapper>

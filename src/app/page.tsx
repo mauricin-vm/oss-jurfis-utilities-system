@@ -1,6 +1,8 @@
 'use client'
 
 //importar bibliotecas e funções
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -8,9 +10,64 @@ import { Separator } from '@/components/ui/separator';
 import { IoCalendar, IoChatbubbles, IoTime, IoSearch } from 'react-icons/io5';
 import { HiDocumentDuplicate } from 'react-icons/hi';
 import { HiScale } from 'react-icons/hi2';
+import { OnboardingModal } from '@/components/help/onboarding-modal';
+import { OnboardingTour } from '@/components/help/onboarding-tour';
 
 //função principal
 export default function Home() {
+  const { data: session } = useSession();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [runTour, setRunTour] = useState(false);
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
+
+  useEffect(() => {
+    // Verificar se o usuário já completou o onboarding
+    const checkOnboarding = async () => {
+      if (!session?.user) {
+        setCheckingOnboarding(false);
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/user/onboarding');
+        if (response.ok) {
+          const data = await response.json();
+
+          // Mostrar onboarding se ainda não foi completado
+          if (!data.hasCompletedOnboarding) {
+            setShowOnboarding(true);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao verificar onboarding:', error);
+      } finally {
+        setCheckingOnboarding(false);
+      }
+    };
+
+    checkOnboarding();
+  }, [session]);
+
+  const handleCloseOnboarding = async () => {
+    setShowOnboarding(false);
+
+    // Marcar como concluído no backend
+    try {
+      await fetch('/api/user/onboarding', {
+        method: 'POST',
+      });
+    } catch (error) {
+      console.error('Erro ao marcar onboarding como concluído:', error);
+    }
+  };
+
+  const handleStartTour = () => {
+    setRunTour(true);
+  };
+
+  const handleFinishTour = () => {
+    setRunTour(false);
+  };
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -194,6 +251,20 @@ export default function Home() {
         </div>
         </div>
       </div>
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onClose={handleCloseOnboarding}
+        onStartTour={handleStartTour}
+        userName={session?.user?.name || undefined}
+      />
+
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        run={runTour}
+        onFinish={handleFinishTour}
+      />
     </div>
   );
 };

@@ -5,10 +5,11 @@ import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { CCRPageWrapper } from '../../../../../components/ccr-page-wrapper';
 import { Button } from '@/components/ui/button';
-import { Pencil, Newspaper, Phone, MapPin } from 'lucide-react';
+import { Pencil, Newspaper, Phone, MapPin, HelpCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 import { getResourceStatusLabel, getResourceStatusColor } from '../../../../../hooks/resource-status';
 import { TramitationCard } from '../../../tramitacoes/components/tramitation-card';
 import { toast } from 'sonner';
@@ -120,7 +121,7 @@ export default function RecursoDetalhesPage() {
     return (
       <CCRPageWrapper title={<Skeleton className="h-8 w-96" />} breadcrumbs={breadcrumbs}>
         <div className="space-y-6">
-          <Tabs defaultValue="geral" className="w-full flex flex-col focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">
+          <Tabs defaultValue="geral" className="w-full flex flex-col overflow-hidden focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">
             <TabsList className="grid w-full grid-cols-5 bg-muted h-8 p-px">
               <TabsTrigger value="geral" className="cursor-pointer text-xs h-7 px-2 select-none">Geral</TabsTrigger>
               <TabsTrigger value="tramitacoes" className="cursor-pointer text-xs h-7 px-2 select-none">Tramitações</TabsTrigger>
@@ -129,7 +130,7 @@ export default function RecursoDetalhesPage() {
               <TabsTrigger value="historico" className="cursor-pointer text-xs h-7 px-2 select-none">Histórico</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="geral" className="mt-6 space-y-6 focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">
+            <TabsContent value="geral" className="mt-6 space-y-6 overflow-hidden h-[calc(100vh-200px)] focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">
               {/* Card Informações Gerais */}
               <div className="bg-white rounded-lg border p-6">
                 <div className="flex items-center justify-between mb-6">
@@ -236,38 +237,46 @@ export default function RecursoDetalhesPage() {
                   <p className="text-sm text-muted-foreground mt-1.5">Informações principais do processo</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/ccr/recursos/${params.id}/contatos`)}
-                  >
-                    <Phone className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/ccr/recursos/${params.id}/enderecos`)}
-                  >
-                    <MapPin className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/ccr/recursos/${params.id}/publicacoes`)}
-                  >
-                    <Newspaper className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/ccr/recursos/${params.id}/editar`)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
+                  <TooltipWrapper content="Gerenciar contatos">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/ccr/recursos/${params.id}/contatos`)}
+                    >
+                      <Phone className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
+                  <TooltipWrapper content="Gerenciar endereços">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/ccr/recursos/${params.id}/enderecos`)}
+                    >
+                      <MapPin className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
+                  <TooltipWrapper content="Gerenciar publicações">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/ccr/recursos/${params.id}/publicacoes`)}
+                    >
+                      <Newspaper className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
+                  <TooltipWrapper content="Editar recurso">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/ccr/recursos/${params.id}/editar`)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
                 </div>
               </div>
 
@@ -304,7 +313,14 @@ export default function RecursoDetalhesPage() {
 
                 {/* Linha 3 */}
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Recorrente</label>
+                  <label className="block text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                    Recorrente
+                    {resource.type === 'VOLUNTARIO' && !resource.processName && (
+                      <TooltipWrapper content="Preencha o recorrente no botão editar recurso">
+                        <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                      </TooltipWrapper>
+                    )}
+                  </label>
                   <p className="text-sm">
                     {resource.type === 'VOLUNTARIO'
                       ? (resource.processName || '-')
@@ -313,7 +329,14 @@ export default function RecursoDetalhesPage() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Recorrido</label>
+                  <label className="block text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                    Recorrido
+                    {resource.type === 'OFICIO' && !resource.processName && (
+                      <TooltipWrapper content="Preencha o recorrido no botão editar recurso">
+                        <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                      </TooltipWrapper>
+                    )}
+                  </label>
                   <p className="text-sm">
                     {resource.type === 'OFICIO'
                       ? (resource.processName || '-')
@@ -336,14 +359,16 @@ export default function RecursoDetalhesPage() {
                     <h3 className="font-semibold">Assunto</h3>
                     <p className="text-sm text-muted-foreground mt-1.5">Assunto principal e subitens relacionados ao processo</p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/ccr/recursos/${params.id}/assuntos`)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
+                  <TooltipWrapper content="Editar assuntos">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/ccr/recursos/${params.id}/assuntos`)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
                 </div>
 
                 <div className="space-y-4">
@@ -393,14 +418,16 @@ export default function RecursoDetalhesPage() {
                     <h3 className="font-semibold">Partes Interessadas</h3>
                     <p className="text-sm text-muted-foreground mt-1.5">Partes do processo e autoridades vinculadas</p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/ccr/recursos/${params.id}/partes`)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
+                  <TooltipWrapper content="Editar partes interessadas">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/ccr/recursos/${params.id}/partes`)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
                 </div>
 
                 <div className="space-y-4">
@@ -469,12 +496,14 @@ export default function RecursoDetalhesPage() {
                         const formatNames = (authorities: any[]) => {
                           if (authorities.length === 0) return '';
                           // Ordenar por nome em ordem alfabética crescente
-                          const sortedAuthorities = [...authorities].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-                          if (sortedAuthorities.length === 1) return sortedAuthorities[0].name;
-                          if (sortedAuthorities.length === 2) return `${sortedAuthorities[0].name} e ${sortedAuthorities[1].name}`;
+                          const sortedAuthorities = [...authorities].sort((a, b) =>
+                            a.authorityRegistered.name.localeCompare(b.authorityRegistered.name, 'pt-BR')
+                          );
+                          if (sortedAuthorities.length === 1) return sortedAuthorities[0].authorityRegistered.name;
+                          if (sortedAuthorities.length === 2) return `${sortedAuthorities[0].authorityRegistered.name} e ${sortedAuthorities[1].authorityRegistered.name}`;
                           const lastAuth = sortedAuthorities[sortedAuthorities.length - 1];
                           const otherAuths = sortedAuthorities.slice(0, -1);
-                          return `${otherAuths.map((a: any) => a.name).join(', ')} e ${lastAuth.name}`;
+                          return `${otherAuths.map((a: any) => a.authorityRegistered.name).join(', ')} e ${lastAuth.authorityRegistered.name}`;
                         };
 
                         return (
@@ -537,14 +566,16 @@ export default function RecursoDetalhesPage() {
                   </div>
                   <p className="text-sm text-muted-foreground mt-1.5">Inscrições e débitos relacionados ao processo</p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="cursor-pointer"
-                  onClick={() => router.push(`/ccr/recursos/${params.id}/inscricoes`)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
+                <TooltipWrapper content="Editar inscrições">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="cursor-pointer"
+                    onClick={() => router.push(`/ccr/recursos/${params.id}/inscricoes`)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </TooltipWrapper>
               </div>
 
               <div className="space-y-4">

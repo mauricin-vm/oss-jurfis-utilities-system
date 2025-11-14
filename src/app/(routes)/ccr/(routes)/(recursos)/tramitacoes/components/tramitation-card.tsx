@@ -10,6 +10,7 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 
 interface Tramitation {
   id: string;
@@ -208,20 +209,21 @@ export function TramitationCard({ tramitation, onMarkAsReceived, onDelete, userR
                 Marcar Entregue
               </Button>
               {canDelete && onDelete && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleDelete}
-                  disabled={actionLoading !== null}
-                  className="cursor-pointer h-8 w-8"
-                  title="Excluir tramitação"
-                >
-                  {actionLoading === 'delete' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <X className="h-4 w-4" />
-                  )}
-                </Button>
+                <TooltipWrapper content="Excluir tramitação">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleDelete}
+                    disabled={actionLoading !== null}
+                    className="cursor-pointer h-8 w-8"
+                  >
+                    {actionLoading === 'delete' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <X className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipWrapper>
               )}
             </>
           )}

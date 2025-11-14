@@ -75,7 +75,7 @@ export default function EditarInscricoesPage() {
               Gerencie as inscrições e débitos relacionados ao recurso.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="overflow-hidden">
             <div className="space-y-6">
               {/* Lista de Inscrições */}
               <div className="space-y-4">

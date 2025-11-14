@@ -32,6 +32,7 @@ import { MoreHorizontal, Pencil, Trash2, ChevronLeft, ChevronsLeft, ChevronRight
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 import { DeleteModal } from './delete-modal';
 import { ConcludeModal } from './conclude-modal';
 import { ArchiveReasonModal } from './archive-reason-modal';
@@ -258,17 +259,19 @@ export function ProtocolTable({ data, loading, onRefresh, onNewProtocol, userRol
                   isSearchExpanded ? "opacity-100 z-10" : "opacity-0 pointer-events-none"
                 )}
               />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSearchClick}
-                className={cn(
-                  "absolute right-0 top-0 h-8 w-8 p-0 cursor-pointer transition-opacity duration-300",
-                  isSearchExpanded ? "opacity-0 pointer-events-none" : "opacity-100 z-10"
-                )}
-              >
-                <Search className="h-4 w-4" />
-              </Button>
+              <TooltipWrapper content="Buscar por número do protocolo, processo ou apresentante">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSearchClick}
+                  className={cn(
+                    "absolute right-0 top-0 h-8 w-8 p-0 cursor-pointer transition-opacity duration-300",
+                    isSearchExpanded ? "opacity-0 pointer-events-none" : "opacity-100 z-10"
+                  )}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
+              </TooltipWrapper>
             </div>
           </div>
           {isSearchExpanded && (
@@ -344,8 +347,8 @@ export function ProtocolTable({ data, loading, onRefresh, onNewProtocol, userRol
                 <TableHeader>
                   <TableRow className="bg-muted hover:bg-muted border-b">
                     <TableHead className="font-semibold">Número</TableHead>
-                    <TableHead className="font-semibold">Data Criação</TableHead>
-                    <TableHead className="font-semibold">Nº Processo</TableHead>
+                    <TableHead className="font-semibold">Data</TableHead>
+                    <TableHead className="font-semibold">Processo</TableHead>
                     <TableHead className="font-semibold">Apresentante</TableHead>
                     <TableHead className="font-semibold">Status</TableHead>
                     <TableHead className="w-[70px]"></TableHead>
@@ -430,7 +433,7 @@ export function ProtocolTable({ data, loading, onRefresh, onNewProtocol, userRol
                                 Ver Justificativa
                               </DropdownMenuItem>
                             )}
-                            {canDelete && protocol.isLatest && protocol.status !== 'CONCLUIDO' && (
+                            {canDelete && protocol.isLatest && protocol.status === 'PENDENTE' && (
                               <DropdownMenuItem
                                 onClick={() => handleDeleteClick(protocol.id, protocol.number)}
                                 disabled={deletingId === protocol.id || !!protocol.resource}
@@ -504,42 +507,50 @@ export function ProtocolTable({ data, loading, onRefresh, onNewProtocol, userRol
                   Página {currentPage} de {totalPages}
                 </span>
                 <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronsLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronsRight className="h-4 w-4" />
-                  </Button>
+                  <TooltipWrapper content="Primeira página">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
+                  <TooltipWrapper content="Página anterior">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
+                  <TooltipWrapper content="Próxima página">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
+                  <TooltipWrapper content="Última página">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
                 </div>
               </div>
             </div>

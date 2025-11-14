@@ -94,7 +94,7 @@ export default function SessionPublicationsPage() {
           <CardHeader>
             <CardTitle>Histórico de Publicações</CardTitle>
             <CardDescription>
-              Visualize todas as publicações relacionadas a Pauta n. {sessionData?.sessionNumber || 'Carregando...'}
+              Visualize todas as publicações relacionadas a pauta.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -132,7 +132,7 @@ export default function SessionPublicationsPage() {
         <CardHeader>
           <CardTitle>Histórico de Publicações</CardTitle>
           <CardDescription>
-            Visualize todas as publicações relacionadas a Pauta n. {sessionData?.sessionNumber}
+            Visualize todas as publicações relacionadas a pauta.
           </CardDescription>
         </CardHeader>
         <CardContent>

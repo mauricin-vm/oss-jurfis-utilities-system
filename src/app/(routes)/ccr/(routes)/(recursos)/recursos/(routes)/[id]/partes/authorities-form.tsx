@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -12,8 +13,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Plus, HelpCircle, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
+import { Switch } from '@/components/ui/switch';
 import { applyPhoneMask, formatPhoneToDatabase, formatPhoneForDisplay } from '@/lib/validations';
 
 interface Authority {
@@ -36,6 +39,8 @@ interface Part {
   role: string;
   registrationType: string;
   registrationNumber: string;
+  isActive?: boolean;
+  isNew?: boolean;
 }
 
 interface AuthoritiesFormProps {
@@ -58,8 +63,10 @@ interface AuthoritiesFormProps {
       role: string;
       registrationType: string | null;
       registrationNumber: string | null;
+      isActive: boolean;
     }>;
   };
+  registeredAuthorities: RegisteredAuthority[];
 }
 
 const authorityTypeLabels: Record<string, string> = {
@@ -76,11 +83,15 @@ const partRoleLabels: Record<string, string> = {
   OUTRO: 'Outro',
 };
 
-export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
+export function AuthoritiesForm({ initialData, registeredAuthorities }: AuthoritiesFormProps) {
   const router = useRouter();
+  const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
-  const [registeredAuthorities, setRegisteredAuthorities] = useState<RegisteredAuthority[]>([]);
-  const [loadingAuthorities, setLoadingAuthorities] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const userRole = session?.user?.role;
+  const isAdmin = userRole === 'ADMIN';
+  const canToggle = isAdmin || userRole === 'EMPLOYEE';
 
   const [parts, setParts] = useState<Part[]>(
     initialData.parts && initialData.parts.length > 0
@@ -90,6 +101,7 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
         role: part.role,
         registrationType: part.registrationType || '',
         registrationNumber: part.registrationNumber || '',
+        isActive: part.isActive,
       }))
       : []
   );
@@ -104,26 +116,6 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
       : []
   );
 
-  // Buscar autoridades cadastradas
-  useEffect(() => {
-    const fetchAuthorities = async () => {
-      try {
-        const response = await fetch('/api/ccr/authorities-registered');
-        if (response.ok) {
-          const data = await response.json();
-          setRegisteredAuthorities(data);
-        }
-      } catch (error) {
-        console.error('Error fetching authorities:', error);
-        toast.error('Erro ao carregar autoridades');
-      } finally {
-        setLoadingAuthorities(false);
-      }
-    };
-
-    fetchAuthorities();
-  }, []);
-
   const addPart = () => {
     setParts([
       ...parts,
@@ -132,8 +124,91 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
         role: 'REQUERENTE',
         registrationType: '',
         registrationNumber: '',
+        isActive: true,
+        isNew: true,
       },
     ]);
+  };
+
+  const handleToggleActivePart = async (partId: string, partName: string, currentStatus: boolean) => {
+    try {
+      setActionLoading(partId);
+
+      const action = currentStatus ? 'desativar' : 'ativar';
+      const actionPast = currentStatus ? 'desativada' : 'ativada';
+
+      toast.warning(`Tem certeza que deseja ${action} a parte "${partName}"?`, {
+        duration: 10000,
+        action: {
+          label: 'Confirmar',
+          onClick: async () => {
+            const response = await fetch(`/api/ccr/parts/${partId}`, {
+              method: 'PATCH',
+            });
+
+            if (response.ok) {
+              toast.success(`Parte ${actionPast} com sucesso`);
+              // Atualizar o estado local
+              setParts(parts.map(p =>
+                p.id === partId ? { ...p, isActive: !currentStatus } : p
+              ));
+            } else {
+              const error = await response.text();
+              toast.error(error);
+            }
+            setActionLoading(null);
+          },
+        },
+        cancel: {
+          label: 'Cancelar',
+          onClick: () => {
+            setActionLoading(null);
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Error toggling part:', error);
+      toast.error('Erro ao atualizar status');
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeletePart = async (partId: string, partName: string) => {
+    try {
+      setActionLoading(partId);
+
+      toast.warning(`Tem certeza que deseja excluir permanentemente a parte "${partName}"?`, {
+        duration: 10000,
+        action: {
+          label: 'Confirmar',
+          onClick: async () => {
+            const response = await fetch(`/api/ccr/parts/${partId}`, {
+              method: 'DELETE',
+            });
+
+            if (response.ok) {
+              toast.success('Parte excluída permanentemente');
+              // Remover do estado local
+              setParts(parts.filter(p => p.id !== partId));
+            } else {
+              const error = await response.text();
+              toast.error(error);
+            }
+            setActionLoading(null);
+          },
+        },
+        cancel: {
+          label: 'Cancelar',
+          onClick: () => {
+            setActionLoading(null);
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Error deleting part:', error);
+      toast.error('Erro ao excluir parte');
+      setActionLoading(null);
+    }
   };
 
   const removePart = async (index: number) => {
@@ -250,6 +325,7 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
             role: part.role,
             registrationType: part.registrationType || null,
             registrationNumber: part.registrationNumber || null,
+            isActive: part.isActive ?? true,
           })),
           authorities: authorities.map((auth) => ({
             id: auth.id,
@@ -264,12 +340,12 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
         throw new Error(error);
       }
 
-      toast.success('Autoridades atualizadas com sucesso');
+      toast.success('Partes interessadas atualizadas com sucesso');
       router.push(`/ccr/recursos/${initialData.id}`);
       router.refresh();
     } catch (error) {
       console.error('Error saving authorities:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao salvar autoridades');
+      toast.error(error instanceof Error ? error.message : 'Erro ao salvar partes interessadas');
     } finally {
       setLoading(false);
     }
@@ -280,7 +356,12 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
       {/* Partes */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Partes</h3>
+          <h3 className="text-lg font-semibold flex items-center gap-1.5">
+            Partes
+            <TooltipWrapper content="As partes são as pessoas que possuem legitimidade">
+              <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+            </TooltipWrapper>
+          </h3>
         </div>
 
         <div className="space-y-3">
@@ -296,7 +377,7 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
                 <Input
                   value={part.name}
                   onChange={(e) => updatePart(index, 'name', e.target.value)}
-                  disabled={loading}
+                  disabled={loading || (!part.isNew && !part.isActive)}
                   placeholder="Nome da parte"
                   className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
@@ -312,7 +393,7 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
                 <Select
                   value={part.role}
                   onValueChange={(value) => updatePart(index, 'role', value)}
-                  disabled={loading}
+                  disabled={loading || (!part.isNew && !part.isActive)}
                 >
                   <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
                     <SelectValue />
@@ -337,7 +418,7 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
                 <Input
                   value={part.registrationType}
                   onChange={(e) => updatePart(index, 'registrationType', e.target.value)}
-                  disabled={loading}
+                  disabled={loading || (!part.isNew && !part.isActive)}
                   placeholder="Ex: OAB, CRC"
                   className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
@@ -353,24 +434,73 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
                 <Input
                   value={part.registrationNumber}
                   onChange={(e) => updatePart(index, 'registrationNumber', e.target.value)}
-                  disabled={loading}
+                  disabled={loading || (!part.isNew && !part.isActive)}
                   placeholder="Número do registro"
                   className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </div>
 
-              {/* Botão Remover */}
+              {/* Botões de Ação */}
               <div className={index === 0 ? "pt-[28px]" : ""}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removePart(index)}
-                  disabled={loading}
-                  className="shrink-0 cursor-pointer h-10 w-10"
-                >
-                  <Trash2 className="h-4 w-4 text-red-500" />
-                </Button>
+                <div className="flex gap-2 items-center shrink-0">
+                  {/* Switch Ativar/Desativar */}
+                  {canToggle && (
+                    <TooltipWrapper content={part.isActive ? "Desativar parte" : "Ativar parte"}>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={part.isActive}
+                          onCheckedChange={() => {
+                            if (part.isNew) {
+                              // Para partes novas, apenas atualizar o estado local
+                              updatePart(index, 'isActive', !part.isActive);
+                            } else {
+                              // Para partes existentes, fazer chamada à API
+                              handleToggleActivePart(part.id!, part.name, part.isActive!);
+                            }
+                          }}
+                          disabled={!part.isNew && actionLoading === part.id}
+                        />
+                      </div>
+                    </TooltipWrapper>
+                  )}
+
+                  {/* Botão Remover/Excluir */}
+                  {part.isNew ? (
+                    // Botão Remover para partes novas (não salvas)
+                    <TooltipWrapper content="Remover parte">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removePart(index)}
+                        disabled={loading}
+                        className="cursor-pointer"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </TooltipWrapper>
+                  ) : (
+                    // Botão Excluir (apenas ADMIN para partes existentes)
+                    isAdmin && (
+                      <TooltipWrapper content="Excluir parte">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeletePart(part.id!, part.name)}
+                          disabled={actionLoading === part.id}
+                          className="cursor-pointer"
+                        >
+                          {actionLoading === part.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <X className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TooltipWrapper>
+                    )
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -440,10 +570,10 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
                   <Select
                     value={authority.authorityRegisteredId}
                     onValueChange={(value) => updateAuthority(index, 'authorityRegisteredId', value)}
-                    disabled={loading || loadingAuthorities}
+                    disabled={loading}
                   >
                     <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
-                      <SelectValue placeholder={loadingAuthorities ? "Carregando..." : "Selecione uma autoridade"} />
+                      <SelectValue placeholder="Selecione uma autoridade" />
                     </SelectTrigger>
                     <SelectContent className="rounded-lg max-h-[300px]">
                       {availableAuthorities.length === 0 ? (
@@ -463,16 +593,18 @@ export function AuthoritiesForm({ initialData }: AuthoritiesFormProps) {
 
                 {/* Botão Remover */}
                 <div className={index === 0 ? "pt-[28px]" : ""}>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeAuthority(index)}
-                    disabled={loading}
-                    className="shrink-0 cursor-pointer h-10 w-10"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
+                  <TooltipWrapper content="Remover autoridade">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeAuthority(index)}
+                      disabled={loading}
+                      className="shrink-0 cursor-pointer h-10 w-10"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
                 </div>
               </div>
             );

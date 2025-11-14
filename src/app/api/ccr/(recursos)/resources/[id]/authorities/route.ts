@@ -68,6 +68,7 @@ export async function PATCH(
               role: part.role,
               registrationType: part.registrationType,
               registrationNumber: part.registrationNumber,
+              isActive: part.isActive ?? true,
             },
           });
         } else {
@@ -79,6 +80,7 @@ export async function PATCH(
               role: part.role,
               registrationType: part.registrationType,
               registrationNumber: part.registrationNumber,
+              isActive: part.isActive ?? true,
               createdBy: session.user.id,
             },
           });

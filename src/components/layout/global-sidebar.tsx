@@ -66,7 +66,7 @@ export function GlobalSidebar({ onLogin }: GlobalSidebarProps) {
   const role = session?.user?.role;
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" data-tour="sidebar">
       {/* Header com AppSwitcher (se configurado) */}
       {config.showAppSwitcher && (
         <SidebarHeader>

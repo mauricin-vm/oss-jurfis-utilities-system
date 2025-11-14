@@ -12,8 +12,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Plus, X, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 
 interface Registration {
   id?: string;
@@ -325,12 +326,12 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
         throw new Error(error);
       }
 
-      toast.success('Valores atualizados com sucesso');
+      toast.success('Inscrições atualizadas com sucesso');
       router.push(`/ccr/recursos/${initialData.id}`);
       router.refresh();
     } catch (error) {
       console.error('Error saving values:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao salvar valores');
+      toast.error(error instanceof Error ? error.message : 'Erro ao salvar inscrições');
     } finally {
       setLoading(false);
     }
@@ -375,19 +376,21 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
                     )}
                   </div>
                 </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeRegistration(regIndex);
-                  }}
-                  disabled={loading}
-                  className="cursor-pointer"
-                >
-                  <Trash2 className="h-4 w-4 text-red-500" />
-                </Button>
+                <TooltipWrapper content="Remover inscrição">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeRegistration(regIndex);
+                    }}
+                    disabled={loading}
+                    className="cursor-pointer"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </TooltipWrapper>
               </div>
 
               {/* Conteúdo Expansível */}
@@ -427,7 +430,12 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
                     </div>
 
                     <div className="space-y-0">
-                      <Label className="block text-sm font-medium mb-1.5">CEP</Label>
+                      <Label className="block text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                        CEP
+                        <TooltipWrapper content="Preencha o CEP e aperte a tecla TAB">
+                          <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                        </TooltipWrapper>
+                      </Label>
                       <Input
                         value={registration.cep}
                         onChange={(e) => {
@@ -571,7 +579,7 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
                             <div className="flex-1 min-w-0">
                               {valueIndex === 0 && (
                                 <Label className="block text-sm font-medium mb-1.5">
-                                  Valor <span className="text-red-500">*</span>
+                                  Valor Lançado <span className="text-red-500">*</span>
                                 </Label>
                               )}
                               <Input
@@ -604,16 +612,18 @@ export function ValuesForm({ initialData }: ValuesFormProps) {
 
                             {/* Botão Remover */}
                             <div className={valueIndex === 0 ? "pt-[28px]" : ""}>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => removeValue(regIndex, valueIndex)}
-                                disabled={loading}
-                                className="shrink-0 cursor-pointer h-10 w-10"
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </Button>
+                              <TooltipWrapper content="Remover débito">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => removeValue(regIndex, valueIndex)}
+                                  disabled={loading}
+                                  className="shrink-0 cursor-pointer h-10 w-10"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </TooltipWrapper>
                             </div>
                           </div>
                         ))}

@@ -24,7 +24,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, HelpCircle } from 'lucide-react';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 
 type TramitationFormValues = {
   processNumber: string;
@@ -207,8 +208,11 @@ export function TramitationForm() {
             name="purpose"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>
+                <FormLabel className="flex items-center gap-1.5">
                   Finalidade <span className="text-red-500">*</span>
+                  <TooltipWrapper content="O status do recurso será alterado conforme a finalidade escolhida">
+                    <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  </TooltipWrapper>
                 </FormLabel>
                 <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
@@ -347,7 +351,12 @@ export function TramitationForm() {
             name="deadline"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Prazo Limite</FormLabel>
+                <FormLabel className="flex items-center gap-1.5">
+                  Prazo Limite
+                  <TooltipWrapper content="Preencha o prazo limite para controlar o vencimento da tramitação">
+                    <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  </TooltipWrapper>
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="date"

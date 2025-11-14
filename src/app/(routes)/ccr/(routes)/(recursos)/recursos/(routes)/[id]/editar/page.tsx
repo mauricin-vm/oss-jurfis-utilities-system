@@ -54,12 +54,12 @@ export default function EditarRecursoPage() {
 
   if (loading) {
     return (
-      <CCRPageWrapper title="Editar Processo" breadcrumbs={breadcrumbs}>
+      <CCRPageWrapper title="Editar Recurso" breadcrumbs={breadcrumbs}>
         <Card>
           <CardHeader>
-            <CardTitle>Editar Processo</CardTitle>
+            <CardTitle>Editar Recurso</CardTitle>
             <CardDescription>
-              Atualize o status, tipo e informações gerais do processo
+              Atualize o status, tipo e informações gerais do recurso
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -115,7 +115,7 @@ export default function EditarRecursoPage() {
 
   if (!resource) {
     return (
-      <CCRPageWrapper title="Editar Processo" breadcrumbs={breadcrumbs}>
+      <CCRPageWrapper title="Editar Recurso" breadcrumbs={breadcrumbs}>
         <Card>
           <CardContent className="flex h-[400px] items-center justify-center">
             <p className="text-muted-foreground">Recurso não encontrado</p>
@@ -126,12 +126,12 @@ export default function EditarRecursoPage() {
   }
 
   return (
-    <CCRPageWrapper title="Editar Processo" breadcrumbs={breadcrumbs}>
+    <CCRPageWrapper title="Editar Recurso" breadcrumbs={breadcrumbs}>
       <Card>
         <CardHeader>
-          <CardTitle>Editar Processo</CardTitle>
+          <CardTitle>Editar Recurso</CardTitle>
           <CardDescription>
-            Atualize o status, tipo e informações gerais do processo
+            Atualize o status, tipo e informações gerais do recurso
           </CardDescription>
         </CardHeader>
         <CardContent>

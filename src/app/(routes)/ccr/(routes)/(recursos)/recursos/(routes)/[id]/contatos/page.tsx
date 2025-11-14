@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 import { Plus, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatPhoneForDisplay } from '@/lib/validations';
@@ -20,6 +21,7 @@ interface Contact {
   value: string;
   isPrimary: boolean;
   isActive: boolean;
+  isVerified: boolean;
   isNew?: boolean;
 }
 
@@ -39,7 +41,7 @@ const roleLabels: Record<string, string> = {
 
 const contactTypeOptions = [
   { value: 'TELEFONE', label: 'Telefone' },
-  { value: 'EMAIL', label: 'E-mail' },
+  { value: 'EMAIL', label: 'Email' },
 ];
 
 export default function ContatosPage() {
@@ -103,6 +105,7 @@ export default function ContatosPage() {
       value: '',
       isPrimary: false,
       isActive: true,
+      isVerified: false,
       isNew: true,
     });
     setParts(updated);
@@ -138,6 +141,12 @@ export default function ContatosPage() {
       };
     }
 
+    setParts(updated);
+  };
+
+  const removeContact = (partIndex: number, contactIndex: number) => {
+    const updated = [...parts];
+    updated[partIndex].contacts.splice(contactIndex, 1);
     setParts(updated);
   };
 
@@ -251,6 +260,7 @@ export default function ContatosPage() {
             type: contact.type,
             value: contact.type === 'TELEFONE' ? contact.value.replace(/\D/g, '') : contact.value,
             isPrimary: contact.isPrimary,
+            isVerified: contact.isVerified,
             isNew: contact.isNew,
           })),
       }));
@@ -267,7 +277,7 @@ export default function ContatosPage() {
 
       if (response.ok) {
         toast.success('Contatos atualizados com sucesso');
-        await fetchResource();
+        router.push(`/ccr/recursos/${params.id}`);
       } else {
         const error = await response.text();
         throw new Error(error);
@@ -295,7 +305,7 @@ export default function ContatosPage() {
           <CardHeader>
             <CardTitle>Contatos das Partes</CardTitle>
             <CardDescription>
-              Gerencie os contatos (telefones e e-mails) das partes envolvidas no processo.
+              Gerencie os contatos (telefones e emails) das partes envolvidas no processo.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -313,7 +323,8 @@ export default function ContatosPage() {
                     <Skeleton className="h-4 w-20" />
                     {Array.from({ length: 2 }).map((_, j) => (
                       <div key={j} className="flex gap-2 items-center">
-                        <div className="grid grid-cols-2 gap-2 flex-1">
+                        <div className="grid grid-cols-3 gap-2 flex-1">
+                          <Skeleton className="h-10 w-full" />
                           <Skeleton className="h-10 w-full" />
                           <Skeleton className="h-10 w-full" />
                         </div>
@@ -348,7 +359,7 @@ export default function ContatosPage() {
         <CardHeader>
           <CardTitle>Contatos das Partes</CardTitle>
           <CardDescription>
-            Gerencie os contatos (telefones e e-mails) das partes envolvidas no processo.
+            Gerencie os contatos (telefones e emails) das partes envolvidas no processo.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -382,7 +393,7 @@ export default function ContatosPage() {
                       <label className="block text-sm font-medium text-gray-700">Contatos</label>
                       {part.contacts.map((contact, contactIndex) => (
                         <div key={contact.id || contactIndex} className="flex gap-2 items-center">
-                          <div className="grid grid-cols-2 gap-2 flex-1">
+                          <div className="grid grid-cols-3 gap-2 flex-1">
                             {/* Tipo de Contato */}
                             <div>
                               <Select
@@ -421,42 +432,86 @@ export default function ContatosPage() {
                                 className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                               />
                             </div>
+
+                            {/* Status de Validação */}
+                            <div>
+                              <Select
+                                value={contact.isVerified ? 'VALIDADO' : 'NAO_VALIDADO'}
+                                onValueChange={(value) =>
+                                  updateContact(partIndex, contactIndex, 'isVerified', value === 'VALIDADO')
+                                }
+                                disabled={!contact.isNew && !contact.isActive}
+                              >
+                                <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-lg">
+                                  <SelectItem value="VALIDADO">Validado</SelectItem>
+                                  <SelectItem value="NAO_VALIDADO">Não Validado</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
 
                           {/* Botões de Ação */}
-                          {!contact.isNew && (
-                            <div className="flex gap-2 items-center shrink-0">
-                              {/* Switch Ativar/Desativar */}
-                              {canToggle && (
+                          <div className="flex gap-2 items-center shrink-0">
+                            {/* Switch Ativar/Desativar */}
+                            {canToggle && (
+                              <TooltipWrapper content={contact.isActive ? "Desativar contato" : "Ativar contato"}>
                                 <div className="flex items-center gap-2">
                                   <Switch
                                     checked={contact.isActive}
-                                    onCheckedChange={() => handleToggleActive(contact.id!, contact.value, contact.isActive)}
-                                    disabled={actionLoading === contact.id}
+                                    onCheckedChange={() => {
+                                      if (contact.isNew) {
+                                        // Para contatos novos, apenas atualizar o estado local
+                                        updateContact(partIndex, contactIndex, 'isActive', !contact.isActive);
+                                      } else {
+                                        // Para contatos existentes, fazer chamada à API
+                                        handleToggleActive(contact.id!, contact.value, contact.isActive);
+                                      }
+                                    }}
+                                    disabled={!contact.isNew && actionLoading === contact.id}
                                   />
                                 </div>
-                              )}
+                              </TooltipWrapper>
+                            )}
 
-                              {/* Botão Excluir (apenas ADMIN) */}
-                              {isAdmin && (
+                            {/* Botão Remover/Excluir */}
+                            {contact.isNew ? (
+                              // Botão Remover para contatos novos
+                              <TooltipWrapper content="Remover contato">
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleDelete(contact.id!, contact.value)}
-                                  disabled={actionLoading === contact.id}
+                                  onClick={() => removeContact(partIndex, contactIndex)}
                                   className="cursor-pointer"
-                                  title="Excluir permanentemente"
                                 >
-                                  {actionLoading === contact.id ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <X className="h-4 w-4" />
-                                  )}
+                                  <X className="h-4 w-4" />
                                 </Button>
-                              )}
-                            </div>
-                          )}
+                              </TooltipWrapper>
+                            ) : (
+                              // Botão Excluir (apenas ADMIN para contatos existentes)
+                              isAdmin && (
+                                <TooltipWrapper content="Excluir contato">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleDelete(contact.id!, contact.value)}
+                                    disabled={actionLoading === contact.id}
+                                    className="cursor-pointer"
+                                  >
+                                    {actionLoading === contact.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <X className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </TooltipWrapper>
+                              )
+                            )}
+                          </div>
                         </div>
                       ))}
 

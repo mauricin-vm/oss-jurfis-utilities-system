@@ -9,6 +9,7 @@ interface ContactUpdate {
   type: string;
   value: string;
   isPrimary: boolean;
+  isVerified: boolean;
   isNew?: boolean;
 }
 
@@ -65,6 +66,7 @@ export async function PUT(req: Request) {
               type: contact.type as any,
               value: contact.value,
               isPrimary: contact.isPrimary,
+              isVerified: contact.isVerified,
             },
           });
         } else {
@@ -77,6 +79,7 @@ export async function PUT(req: Request) {
               type: contact.type as any,
               value: contact.value,
               isPrimary: contact.isPrimary,
+              isVerified: contact.isVerified,
               isActive: true,
               createdBy: session.user.id,
             },

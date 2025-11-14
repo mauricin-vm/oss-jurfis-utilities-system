@@ -93,7 +93,7 @@ export default function ResourcePublicationsPage() {
           <CardHeader>
             <CardTitle>Histórico de Publicações</CardTitle>
             <CardDescription>
-              Visualize todas as publicações relacionadas ao Recurso n. {resource?.resourceNumber || 'Carregando...'}
+              Visualize todas as publicações relacionadas ao recurso.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -138,7 +138,7 @@ export default function ResourcePublicationsPage() {
         <CardHeader>
           <CardTitle>Histórico de Publicações</CardTitle>
           <CardDescription>
-            Visualize todas as publicações relacionadas ao Recurso n. {resource?.resourceNumber}
+            Visualize todas as publicações relacionadas ao recurso.
           </CardDescription>
         </CardHeader>
         <CardContent>

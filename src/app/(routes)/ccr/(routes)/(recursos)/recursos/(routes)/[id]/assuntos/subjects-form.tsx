@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, HelpCircle } from 'lucide-react';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 
 interface Subject {
   id: string;
@@ -155,8 +156,11 @@ export function SubjectsForm({ initialData, onSubjectsLoaded }: SubjectsFormProp
     <div className="space-y-6">
       {/* Assunto Principal */}
       <div className="space-y-0">
-        <label className="block text-sm font-medium mb-1.5">
+        <label className="block text-sm font-medium mb-1.5 flex items-center gap-1.5">
           Assunto Principal <span className="text-red-500">*</span>
+          <TooltipWrapper content="Selecione o assunto principal do recurso">
+            <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+          </TooltipWrapper>
         </label>
         <Select value={selectedMainSubject} onValueChange={setSelectedMainSubject}>
           <SelectTrigger className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
@@ -170,15 +174,17 @@ export function SubjectsForm({ initialData, onSubjectsLoaded }: SubjectsFormProp
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-gray-500 mt-1.5">
-          Selecione o assunto principal que motiva o recurso
-        </p>
       </div>
 
       {/* Subitens */}
       {selectedMainSubject && childSubjects.length > 0 && (
         <div className="space-y-0">
-          <label className="block text-sm font-medium mb-1.5">Subitens</label>
+          <label className="block text-sm font-medium mb-1.5 flex items-center gap-1.5">
+            Subitens
+            <TooltipWrapper content="Selecione os subitens que fundamentaram o indeferimento do pedido na decisão singular">
+              <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+            </TooltipWrapper>
+          </label>
           <div className="border border-gray-200 rounded-lg p-4 space-y-3 max-h-[300px] overflow-y-auto">
             {childSubjects.map((subitem) => (
               <div key={subitem.id} className="flex items-center space-x-2">
@@ -196,9 +202,6 @@ export function SubjectsForm({ initialData, onSubjectsLoaded }: SubjectsFormProp
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-500 mt-1.5">
-            Selecione os subitens que se aplicam a este recurso (que levaram a negativa da decisão singular)
-          </p>
         </div>
       )}
 

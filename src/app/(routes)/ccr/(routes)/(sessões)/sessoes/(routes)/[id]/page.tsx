@@ -25,6 +25,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 
 interface SessionResource {
   id: string;
@@ -432,38 +433,46 @@ export default function VisualizarSessaoPage() {
                   <p className="text-sm text-muted-foreground mt-1.5">Detalhes e horários da sessão</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push(`/ccr/sessoes/${session.id}/publicacoes`)}
-                    className="cursor-pointer"
-                  >
-                    <Newspaper className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push(`/ccr/sessoes/${session.id}/distribuicoes`)}
-                    className="cursor-pointer"
-                  >
-                    <Blinds className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push(`/ccr/sessoes/${session.id}/assuntos-administrativos`)}
-                    className="cursor-pointer"
-                  >
-                    <ClipboardList className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push(`/ccr/sessoes/${session.id}/editar`)}
-                    className="cursor-pointer"
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
+                  <TooltipWrapper content="Gerenciar publicações">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/ccr/sessoes/${session.id}/publicacoes`)}
+                      className="cursor-pointer"
+                    >
+                      <Newspaper className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
+                  <TooltipWrapper content="Gerenciar distribuições">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/ccr/sessoes/${session.id}/distribuicoes`)}
+                      className="cursor-pointer"
+                    >
+                      <Blinds className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
+                  <TooltipWrapper content="Gerenciar assuntos administrativos">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/ccr/sessoes/${session.id}/assuntos-administrativos`)}
+                      className="cursor-pointer"
+                    >
+                      <ClipboardList className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
+                  <TooltipWrapper content="Editar sessão">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/ccr/sessoes/${session.id}/editar`)}
+                      className="cursor-pointer"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </TooltipWrapper>
 
                   {/* Botão Publicar Pauta - aparece quando status = PUBLICACAO */}
                   {canPublishAgenda && (
@@ -555,14 +564,16 @@ export default function VisualizarSessaoPage() {
                     {session.members.length} {session.members.length === 1 ? 'participante' : 'participantes'}
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push(`/ccr/sessoes/${session.id}/membros`)}
-                  className="cursor-pointer"
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
+                <TooltipWrapper content="Editar membros participantes">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/ccr/sessoes/${session.id}/membros`)}
+                    className="cursor-pointer"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </TooltipWrapper>
               </div>
 
               <div>

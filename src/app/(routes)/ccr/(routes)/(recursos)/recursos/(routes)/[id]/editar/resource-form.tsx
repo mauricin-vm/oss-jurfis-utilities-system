@@ -21,7 +21,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, HelpCircle } from 'lucide-react';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 import { RESOURCE_STATUS } from '../../../../../../hooks/resource-status';
 
 type ResourceFormValues = {
@@ -60,7 +61,7 @@ export function ResourceForm({ initialData }: ResourceFormProps) {
     try {
       // Validação
       if (!data.processName || data.processName.trim() === '') {
-        toast.error('Nome do processo é obrigatório');
+        toast.error('Razão social é obrigatória');
         return;
       }
 
@@ -200,18 +201,18 @@ export function ResourceForm({ initialData }: ResourceFormProps) {
           />
         </div>
 
-        {/* Nome do Processo */}
+        {/* Razão Social */}
         <FormField
           control={form.control}
           name="processName"
           render={({ field }) => (
             <FormItem className="space-y-0">
               <FormLabel className="block text-sm font-medium mb-1.5">
-                Nome do Processo <span className="text-red-500">*</span>
+                Razão Social <span className="text-red-500">*</span>
               </FormLabel>
               <FormControl>
                 <Input
-                  placeholder="Digite o nome ou descrição do processo"
+                  placeholder="Digite a razão social"
                   className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                   {...field}
                 />
@@ -227,8 +228,11 @@ export function ResourceForm({ initialData }: ResourceFormProps) {
           name="attachedProcesses"
           render={({ field }) => (
             <FormItem className="space-y-0">
-              <FormLabel className="block text-sm font-medium mb-1.5">
+              <FormLabel className="block text-sm font-medium mb-1.5 flex items-center gap-1.5">
                 Processos Apensos
+                <TooltipWrapper content="Separe múltiplos processos por vírgula">
+                  <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                </TooltipWrapper>
               </FormLabel>
               <FormControl>
                 <Input
@@ -237,9 +241,6 @@ export function ResourceForm({ initialData }: ResourceFormProps) {
                   {...field}
                 />
               </FormControl>
-              <p className="text-xs text-gray-500 mt-1.5">
-                Separe múltiplos processos por vírgula
-              </p>
               <FormMessage />
             </FormItem>
           )}

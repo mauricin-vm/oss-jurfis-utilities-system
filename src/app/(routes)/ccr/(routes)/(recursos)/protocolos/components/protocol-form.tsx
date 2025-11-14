@@ -22,7 +22,8 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Loader2, Plus, X } from 'lucide-react';
+import { Loader2, Plus, X, HelpCircle } from 'lucide-react';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 import { formatPhoneForDisplay } from '@/lib/validations';
 
 type ProtocolFormValues = {
@@ -58,7 +59,7 @@ const roleOptions = [
 
 const contactTypeOptions = [
   { value: 'TELEFONE', label: 'Telefone' },
-  { value: 'EMAIL', label: 'E-mail' },
+  { value: 'EMAIL', label: 'Email' },
 ];
 
 export function ProtocolForm({ initialData }: ProtocolFormProps) {
@@ -445,8 +446,11 @@ export function ProtocolForm({ initialData }: ProtocolFormProps) {
 
         {/* Partes */}
         <fieldset className="border border-gray-200 rounded-lg p-4">
-          <legend className="text-sm font-medium px-2">
+          <legend className="text-sm font-medium px-2 flex items-center gap-1.5">
             Partes Envolvidas
+            <TooltipWrapper content="As partes envolvidas são as pessoas que possuem legitimidade">
+              <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+            </TooltipWrapper>
           </legend>
 
           <p className="text-xs text-gray-500 mb-4">

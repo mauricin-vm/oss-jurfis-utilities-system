@@ -26,6 +26,7 @@ import { TramitationSkeleton } from './components/tramitation-skeleton';
 import { AlertCircle, ArrowRightLeft, CheckCircle2, Clock, Filter, Plus, Search, ChevronLeft, ChevronsLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 
 interface Tramitation {
   id: string;
@@ -62,6 +63,15 @@ interface Tramitation {
   };
 }
 
+const purposeLabels: Record<string, string> = {
+  SOLICITAR_PROCESSO: 'Solicitar Processo',
+  CONTRARRAZAO: 'Contrarrazão',
+  PARECER_PGM: 'Parecer PGM',
+  JULGAMENTO: 'Julgamento',
+  DILIGENCIA: 'Diligência',
+  OUTRO: 'Outro',
+};
+
 export default function TramitacoesPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -69,6 +79,7 @@ export default function TramitacoesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [purposeFilter, setPurposeFilter] = useState<string>('all');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -197,6 +208,8 @@ export default function TramitacoesPage() {
       statusMatch = t.status === statusFilter;
     }
 
+    const purposeMatch = purposeFilter === 'all' || t.purpose === purposeFilter;
+
     const searchMatch =
       !searchQuery ||
       t.processNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -206,7 +219,7 @@ export default function TramitacoesPage() {
       t.sector?.abbreviation?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.member?.name?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return statusMatch && searchMatch;
+    return statusMatch && purposeMatch && searchMatch;
   });
 
   // Paginação
@@ -226,6 +239,17 @@ export default function TramitacoesPage() {
     PENDENTE: pendingCount,
     VENCIDA: overdueCount,
     ENTREGUE: deliveredCount,
+  };
+
+  // Purpose counts para o filtro
+  const purposeCounts = {
+    all: tramitations.length,
+    SOLICITAR_PROCESSO: tramitations.filter(t => t.purpose === 'SOLICITAR_PROCESSO').length,
+    CONTRARRAZAO: tramitations.filter(t => t.purpose === 'CONTRARRAZAO').length,
+    PARECER_PGM: tramitations.filter(t => t.purpose === 'PARECER_PGM').length,
+    JULGAMENTO: tramitations.filter(t => t.purpose === 'JULGAMENTO').length,
+    DILIGENCIA: tramitations.filter(t => t.purpose === 'DILIGENCIA').length,
+    OUTRO: tramitations.filter(t => t.purpose === 'OUTRO').length,
   };
 
   // Se ainda está carregando a sessão, não renderizar nada
@@ -267,17 +291,19 @@ export default function TramitacoesPage() {
                     isSearchExpanded ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none'
                   )}
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSearchClick}
-                  className={cn(
-                    'absolute right-0 top-0 h-8 w-8 p-0 cursor-pointer transition-opacity duration-300',
-                    isSearchExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100 z-10'
-                  )}
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
+                <TooltipWrapper content="Buscar por número do processo, destino, setor ou conselheiro">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSearchClick}
+                    className={cn(
+                      'absolute right-0 top-0 h-8 w-8 p-0 cursor-pointer transition-opacity duration-300',
+                      isSearchExpanded ? 'opacity-0 pointer-events-none' : 'opacity-100 z-10'
+                    )}
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                </TooltipWrapper>
               </div>
             </div>
             {isSearchExpanded && (
@@ -317,6 +343,43 @@ export default function TramitacoesPage() {
                       </SelectItem>
                       <SelectItem value="ENTREGUE" className="cursor-pointer h-9">
                         Entregues ({statusCounts.ENTREGUE})
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Finalidade
+                  </label>
+                  <Select value={purposeFilter} onValueChange={(value) => {
+                    setPurposeFilter(value);
+                    setCurrentPage(1);
+                  }}>
+                    <SelectTrigger className="h-10 w-full px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
+                      <SelectValue placeholder="Selecione a finalidade" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-md">
+                      <SelectItem value="all" className="cursor-pointer h-9">
+                        Todas ({purposeCounts.all})
+                      </SelectItem>
+                      <SelectItem value="SOLICITAR_PROCESSO" className="cursor-pointer h-9">
+                        {purposeLabels.SOLICITAR_PROCESSO} ({purposeCounts.SOLICITAR_PROCESSO})
+                      </SelectItem>
+                      <SelectItem value="CONTRARRAZAO" className="cursor-pointer h-9">
+                        {purposeLabels.CONTRARRAZAO} ({purposeCounts.CONTRARRAZAO})
+                      </SelectItem>
+                      <SelectItem value="PARECER_PGM" className="cursor-pointer h-9">
+                        {purposeLabels.PARECER_PGM} ({purposeCounts.PARECER_PGM})
+                      </SelectItem>
+                      <SelectItem value="JULGAMENTO" className="cursor-pointer h-9">
+                        {purposeLabels.JULGAMENTO} ({purposeCounts.JULGAMENTO})
+                      </SelectItem>
+                      <SelectItem value="DILIGENCIA" className="cursor-pointer h-9">
+                        {purposeLabels.DILIGENCIA} ({purposeCounts.DILIGENCIA})
+                      </SelectItem>
+                      <SelectItem value="OUTRO" className="cursor-pointer h-9">
+                        {purposeLabels.OUTRO} ({purposeCounts.OUTRO})
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -449,42 +512,50 @@ export default function TramitacoesPage() {
                     Página {currentPage} de {totalPages}
                   </span>
                   <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setCurrentPage(1)}
-                      disabled={currentPage === 1}
-                    >
-                      <ChevronsLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setCurrentPage(totalPages)}
-                      disabled={currentPage === totalPages}
-                    >
-                      <ChevronsRight className="h-4 w-4" />
-                    </Button>
+                    <TooltipWrapper content="Primeira página">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+                    </TooltipWrapper>
+                    <TooltipWrapper content="Página anterior">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                    </TooltipWrapper>
+                    <TooltipWrapper content="Próxima página">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </TooltipWrapper>
+                    <TooltipWrapper content="Última página">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                      >
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </TooltipWrapper>
                   </div>
                 </div>
               </div>

@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { HelpCircle } from 'lucide-react';
 import { OvertimeFormData } from '../types';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 import {
   Select,
   SelectContent,
@@ -210,7 +212,12 @@ export function AddRecordModal({ isOpen, onClose, onSave }: AddRecordModalProps)
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Novo Registro Mensal</h2>
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                Novo Registro Mensal
+                <TooltipWrapper content="O saldo é calculado automaticamente: Horas Extras - Horas de Atraso = Saldo do Mês">
+                  <HelpCircle className="h-5 w-5 text-gray-400 cursor-help" />
+                </TooltipWrapper>
+              </h2>
               <p className="text-sm text-gray-600 mt-1">Registre suas horas extras e atrasos do mês</p>
             </div>
             <button

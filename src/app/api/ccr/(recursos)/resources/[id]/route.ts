@@ -97,6 +97,7 @@ export async function GET(
         role: true,
         registrationType: true,
         registrationNumber: true,
+        isActive: true,
       },
     });
 
@@ -209,6 +210,7 @@ export async function PATCH(
         role: true,
         registrationType: true,
         registrationNumber: true,
+        isActive: true,
       },
     });
 

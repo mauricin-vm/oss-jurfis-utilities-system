@@ -22,8 +22,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, HelpCircle } from 'lucide-react';
 
 type SubjectFormValues = {
   name: string;
@@ -168,7 +169,12 @@ export function SubjectForm({ initialData }: SubjectFormProps) {
           name="parentId"
           render={({ field }) => (
             <FormItem className="space-y-0">
-              <FormLabel className="block text-sm font-medium mb-1.5">Assunto Pai (Hierarquia)</FormLabel>
+              <FormLabel className="block text-sm font-medium mb-1.5 flex items-center gap-2">
+                Assunto Pai (Hierarquia)
+                <TooltipWrapper content="Selecione um assunto principal para criar uma subcategoria. Isso ajuda a organizar os recursos por temas relacionados.">
+                  <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                </TooltipWrapper>
+              </FormLabel>
               <Select
                 onValueChange={(value) => field.onChange(value === 'none' ? '' : value)}
                 defaultValue={field.value || 'none'}
@@ -188,9 +194,6 @@ export function SubjectForm({ initialData }: SubjectFormProps) {
                   ))}
                 </SelectContent>
               </Select>
-              <FormDescription className="text-xs text-gray-500 mt-2">
-                Deixe em branco para criar um assunto principal, ou selecione um pai para criar um sub-item
-              </FormDescription>
             </FormItem>
           )}
         />

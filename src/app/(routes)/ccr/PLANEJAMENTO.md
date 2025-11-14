@@ -1133,7 +1133,7 @@ enum NotificationContactStatus {
 }
 
 enum NotificationChannel {
-  EMAIL     // Envio por e-mail
+  EMAIL     // Envio por email
   WHATSAPP  // Envio por WhatsApp
   CORREIOS  // Envio por Correios (AR)
   EDITAL    // Publicação em edital
@@ -3033,7 +3033,7 @@ export function getCCRNotificationTemplate(data: {
             <p>Atenciosamente,<br>Junta de Recursos Fiscais - SEFAZ</p>
           </div>
           <div class="footer">
-            <p>Este é um e-mail automático. Por favor, não responda.</p>
+            <p>Este é um email automático. Por favor, não responda.</p>
           </div>
         </div>
       </body>

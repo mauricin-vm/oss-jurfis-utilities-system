@@ -1,6 +1,7 @@
 "use client"
 
-import { ChevronsUpDown, LogOut, User } from "lucide-react"
+import { ChevronsUpDown, HelpCircle, LogOut, User } from "lucide-react"
+import Link from "next/link"
 
 import {
   DropdownMenu,
@@ -86,7 +87,7 @@ export function NavUser({ userName, userEmail, isAdmin, organizationName, role, 
 
   return (
     <SidebarMenu>
-      <SidebarMenuItem>
+      <SidebarMenuItem data-tour="user-menu">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
@@ -143,6 +144,12 @@ export function NavUser({ userName, userEmail, isAdmin, organizationName, role, 
                 <DropdownMenuSeparator />
               </>
             )}
+            <DropdownMenuItem asChild className="h-9 cursor-pointer">
+              <Link href="/ajuda">
+                <HelpCircle className="mr-2 size-4" />
+                Ajuda
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={onLogout} className="h-9 cursor-pointer">
               <LogOut className="mr-2 size-4" />
               Sair

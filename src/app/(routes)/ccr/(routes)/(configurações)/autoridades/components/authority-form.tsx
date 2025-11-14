@@ -15,7 +15,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, HelpCircle } from 'lucide-react';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 
 type AuthorityFormValues = {
   name: string;
@@ -132,7 +133,12 @@ export function AuthorityForm({ initialData }: AuthorityFormProps) {
             name="phone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Telefone</FormLabel>
+                <FormLabel className="flex items-center gap-1.5">
+                  Telefone
+                  <TooltipWrapper content="Preencha o telefone para que a autoridade receba informações processuais">
+                    <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  </TooltipWrapper>
+                </FormLabel>
                 <FormControl>
                   <Input
                     placeholder="(67) 98765-4321"
@@ -155,7 +161,12 @@ export function AuthorityForm({ initialData }: AuthorityFormProps) {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel className="flex items-center gap-1.5">
+                  Email
+                  <TooltipWrapper content="Preencha o email para que a autoridade receba informações processuais">
+                    <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  </TooltipWrapper>
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="email"

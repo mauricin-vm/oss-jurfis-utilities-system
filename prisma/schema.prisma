@@ -38,8 +38,10 @@ model User {
   publicationsCreated  Publication[]     @relation("PublicationCreatedBy")
   historyCreated       ResourceHistory[] @relation("HistoryCreatedBy")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  hasCompletedOnboarding Boolean   @default(false)
+  lastOnboardingDate     DateTime?
 
   @@map("User")
   @@schema("public")
@@ -147,9 +149,8 @@ model OvertimeRecord {
 // ============================================================================
 
 // ============================================
-// TABELA DE PARTES (PARTES DO PROCESSO)
+// TABELA DE PARTES E RELACIONAMENTO
 // ============================================
-// Representa as partes envolvidas (requerente, patrono, representante, etc)
 model Part {
   id String @id @default(uuid())
 
@@ -165,6 +166,9 @@ model Part {
   // Relacionamentos
   protocols ProtocolPart[] // Protocolos que usam esta parte
   contacts  Contact[] // Contatos da parte (telefones/emails)
+
+  // Status
+  isActive Boolean @default(true) // Parte ativa (soft delete)
 
   // Auditoria
   createdBy     String
@@ -183,7 +187,6 @@ model Part {
 // ============================================
 // TABELA DE CONTATOS
 // ============================================
-// Contatos (telefones/emails) vinculados a uma parte e protocolo
 model Contact {
   id String @id @default(uuid())
 
@@ -223,28 +226,7 @@ model Contact {
 }
 
 // ============================================
-// TABELA DE JUNÇÃO: PROTOCOL <-> PART
-// ============================================
-model ProtocolPart {
-  id String @id @default(uuid())
-
-  protocolId String
-  protocol   Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
-
-  partId String
-  part   Part   @relation(fields: [partId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-  @@unique([protocolId, partId]) // Uma parte não pode ser adicionada duas vezes ao mesmo protocolo
-  @@index([protocolId])
-  @@index([partId])
-  @@map("CCR_ProtocolPart")
-  @@schema("jurfis")
-}
-
-// ============================================
-// 1. MÓDULO DE PROTOCOLOS
+// TABELA DE PROTOCOLOS E RELACIONAMENTO
 // ============================================
 model Protocol {
   id             String         @id @default(uuid())
@@ -274,167 +256,27 @@ model Protocol {
   @@schema("jurfis")
 }
 
-// ============================================
-// TABELA DE SETORES
-// ============================================
-model Sector {
-  id           String  @id @default(uuid())
-  name         String  @unique // Nome completo do setor (ex: "Fiscalização", "Contencioso")
-  abbreviation String? @unique // Abreviação do setor (ex: "FISC", "CONT")
-  dispatchCode String? // Código identificador para despacho
-  description  String? @db.Text
+model ProtocolPart {
+  id String @id @default(uuid())
 
-  // Informações de contato
-  phone   String?
-  email   String?
-  address String? @db.Text
+  protocolId String
+  protocol   Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
 
-  isActive Boolean @default(true)
-
-  // Relacionamentos
-  tramitations  Tramitation[]
-  notifications Notification[]
+  partId String
+  part   Part   @relation(fields: [partId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  @@index([isActive])
-  @@map("CCR_Sector")
+  @@unique([protocolId, partId]) // Uma parte não pode ser adicionada duas vezes ao mesmo protocolo
+  @@index([protocolId])
+  @@index([partId])
+  @@map("CCR_ProtocolPart")
   @@schema("jurfis")
 }
 
 // ============================================
-// TABELA DE MEMBROS (CONSELHEIROS)
+// TABELA DE RECURSOS
 // ============================================
-model Member {
-  id           String  @id @default(uuid())
-  name         String // Nome completo do membro
-  role         String? // Cargo (ex: "Presidente", "Conselheiro Titular", etc)
-  cpf          String? // CPF
-  registration String? // Matrícula
-  agency       String? // Órgão
-  phone        String?
-  email        String?
-  gender       Gender? // MASCULINO ou FEMININO
-  isActive     Boolean @default(true)
-
-  // Relacionamentos
-  tramitations                Tramitation[]
-  sessionsAsPresident         Session[]               @relation("SessionPresident")
-  sessionsPresent             SessionMember[]         @relation("SessionMembersPresent")
-  sessionResourcesAsPresident SessionResource[]       @relation("SessionResourcePresident")
-  distributions               SessionDistribution[]   @relation("SessionDistributions")
-  votes                       SessionMemberVote[]     @relation("MemberVotes")
-  votesFollowed               SessionMemberVote[]     @relation("FollowedMembers")
-  sessionVotingResultsWon     SessionVotingResult[]   @relation("VotingResultWinners")
-  minutesAsPresident          SessionMinutes[]        @relation("MinutesPresident")
-  minutesPresent              SessionMinutesMember[]  @relation("MinutesMembersPresent")
-  minutesAbsences             SessionMinutesAbsence[] @relation("MinutesAbsences")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([isActive])
-  @@map("CCR_Member")
-  @@schema("jurfis")
-}
-
-// ============================================
-// TABELA DE AUTORIDADES CADASTRADAS
-// ============================================
-model AuthorityRegistered {
-  id       String  @id @default(uuid())
-  name     String // Nome completo da autoridade
-  phone    String? // Telefone
-  email    String? // Email
-  isActive Boolean @default(true)
-
-  // Relacionamentos
-  authorities Authority[] // Autoridades vinculadas aos recursos
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([isActive])
-  @@index([name])
-  @@map("CCR_AuthorityRegistered")
-  @@schema("jurfis")
-}
-
-// ============================================
-// 2. MÓDULO DE TRAMITAÇÕES
-// ============================================
-model Tramitation {
-  id            String    @id @default(uuid())
-  protocolId    String?
-  protocol      Protocol? @relation(fields: [protocolId], references: [id])
-  processNumber String // Número do processo
-
-  purpose TramitationPurpose // SOLICITAR_PROCESSO, CONTRARRAZAO, JULGAMENTO, etc
-
-  // Destino da tramitação (3 opções, pelo menos uma obrigatória):
-
-  // Opção 1: Setor (FK para tabela Sector)
-  sectorId String?
-  sector   Sector? @relation(fields: [sectorId], references: [id])
-
-  // Opção 2: Membro/Conselheiro (FK para tabela Member)
-  memberId String?
-  member   Member? @relation(fields: [memberId], references: [id])
-
-  // Opção 3: Destino (texto livre)
-  destination String? // Para quando não é setor nem membro específico
-
-  requestDate  DateTime          @default(now())
-  deadline     DateTime? // Prazo limite
-  returnDate   DateTime? // Data de retorno (quando voltar)
-  status       TramitationStatus @default(PENDENTE)
-  observations String?           @db.Text
-
-  createdBy     String
-  createdByUser User     @relation("TramitationCreatedBy", fields: [createdBy], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([processNumber])
-  @@index([deadline])
-  @@index([status])
-  @@index([sectorId])
-  @@index([memberId])
-  @@map("CCR_Tramitation")
-  @@schema("jurfis")
-}
-
-// ============================================
-// TABELA DE ASSUNTOS (PADRÕES COM HIERARQUIA)
-// ============================================
-model Subject {
-  id          String  @id @default(uuid())
-  name        String // Nome do assunto (ex: "Isenção de IPTU", "Possui renda superior a 2 salários mínimos")
-  description String? @db.Text
-  isActive    Boolean @default(true)
-
-  // Hierarquia: Assunto principal → Subitens (motivos)
-  parentId String? // Null = assunto principal, preenchido = subitem
-  parent   Subject?  @relation("SubjectHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
-  children Subject[] @relation("SubjectHierarchy")
-
-  // Relacionamentos com recursos
-  resourceLinks SubjectChildren[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([isActive])
-  @@index([parentId])
-  @@map("CCR_Subject")
-  @@schema("jurfis")
-}
-
-// ============================================
-// 3. MÓDULO DE RECURSOS
-// ============================================
-// Recurso só é criado quando o protocolo é admitido como recurso
 model Resource {
   id             String @id @default(uuid())
   resourceNumber String @unique // "XXXX/YYYY"
@@ -482,25 +324,59 @@ model Resource {
 }
 
 // ============================================
-// TABELA DE RELACIONAMENTO: RECURSO <-> ASSUNTO (Many-to-Many com Hierarquia)
+// ENDEREÇOS
 // ============================================
-model SubjectChildren {
+model Address {
   id         String   @id @default(uuid())
   resourceId String
   resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-  subjectId  String
-  subject    Subject  @relation(fields: [subjectId], references: [id])
 
-  // Marcador de assunto principal
-  isPrimary Boolean @default(false) // True = assunto principal do recurso, False = subitem/motivo
+  type         AddressType
+  cep          String?
+  street       String // Rua/Logradouro
+  number       String? // Número
+  complement   String? // Complemento
+  neighborhood String? // Bairro
+  city         String // Cidade
+  state        String // Estado (UF)
+
+  isPrimary Boolean @default(false)
+  isActive  Boolean @default(true) // Endereço ativo (soft delete)
 
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  @@unique([resourceId, subjectId])
   @@index([resourceId])
-  @@index([subjectId])
-  @@index([isPrimary])
-  @@map("CCR_SubjectChildren")
+  @@index([type])
+  @@map("CCR_Address")
+  @@schema("jurfis")
+}
+
+// ============================================
+// TABELA DE PUBLICAÇÕES
+// ============================================
+model Publication {
+  id String @id @default(uuid())
+
+  type              PublicationType
+  publicationNumber String
+  publicationDate   DateTime
+
+  resourceId String?
+  resource   Resource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  sessionId  String?
+  session    Session?  @relation(fields: [sessionId], references: [id])
+
+  createdBy     String
+  createdByUser User     @relation("PublicationCreatedBy", fields: [createdBy], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([resourceId])
+  @@index([sessionId])
+  @@index([type])
+  @@index([publicationDate])
+  @@map("CCR_Publication")
   @@schema("jurfis")
 }
 
@@ -535,9 +411,6 @@ model Registration {
   @@schema("jurfis")
 }
 
-// ============================================
-// TABELA DE VALORES DAS INSCRIÇÕES
-// ============================================
 model RegistrationValue {
   id             String       @id @default(uuid())
   registrationId String
@@ -556,30 +429,102 @@ model RegistrationValue {
 }
 
 // ============================================
-// AUTORIDADES VINCULADAS AO RECURSO
+// TABELA DE TRAMITAÇÕES
 // ============================================
-model Authority {
-  id         String   @id @default(uuid())
-  resourceId String
-  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+model Tramitation {
+  id            String    @id @default(uuid())
+  protocolId    String?
+  protocol      Protocol? @relation(fields: [protocolId], references: [id])
+  processNumber String // Número do processo
 
-  type AuthorityType // Tipo de autoridade
+  purpose TramitationPurpose // SOLICITAR_PROCESSO, CONTRARRAZAO, JULGAMENTO, etc
 
-  authorityRegisteredId String
-  authorityRegistered   AuthorityRegistered @relation(fields: [authorityRegisteredId], references: [id], onDelete: Restrict)
+  // Destino da tramitação (3 opções, pelo menos uma obrigatória):
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // Opção 1: Setor (FK para tabela Sector)
+  sectorId String?
+  sector   Sector? @relation(fields: [sectorId], references: [id])
 
-  @@index([resourceId])
-  @@index([type])
-  @@index([authorityRegisteredId])
-  @@map("CCR_Authority")
+  // Opção 2: Membro/Conselheiro (FK para tabela Member)
+  memberId String?
+  member   Member? @relation(fields: [memberId], references: [id])
+
+  // Opção 3: Destino (texto livre)
+  destination String? // Para quando não é setor nem membro específico
+
+  requestDate  DateTime          @default(now())
+  deadline     DateTime? // Prazo limite
+  returnDate   DateTime? // Data de retorno (quando voltar)
+  status       TramitationStatus @default(PENDENTE)
+  observations String?           @db.Text
+
+  createdBy     String
+  createdByUser User     @relation("TramitationCreatedBy", fields: [createdBy], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([processNumber])
+  @@index([deadline])
+  @@index([status])
+  @@index([sectorId])
+  @@index([memberId])
+  @@map("CCR_Tramitation")
   @@schema("jurfis")
 }
 
 // ============================================
-// 4. MÓDULO DE SESSÕES
+// TABELA DE DOCUMENTOS
+// ============================================
+model Document {
+  id         String   @id @default(uuid())
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  type           DocumentType
+  title          String
+  description    String?      @db.Text
+  fileName       String
+  storedFileName String
+  filePath       String
+  fileSize       Int
+  mimeType       String
+
+  uploadedBy     String
+  uploadedByUser User     @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id])
+  uploadedAt     DateTime @default(now())
+
+  @@index([resourceId])
+  @@index([type])
+  @@map("CCR_Document")
+  @@schema("jurfis")
+}
+
+// ============================================
+// HISTÓRICO
+// ============================================
+model ResourceHistory {
+  id         String   @id @default(uuid())
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  action      HistoryAction
+  description String        @db.Text
+  metadata    Json?
+  isManual    Boolean       @default(false)
+
+  createdBy     String
+  createdByUser User     @relation("HistoryCreatedBy", fields: [createdBy], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@index([resourceId])
+  @@index([createdAt])
+  @@index([isManual])
+  @@map("CCR_ResourceHistory")
+  @@schema("jurfis")
+}
+
+// ============================================
+// TABELA DE SESSÕES E RELACIONAMENTO
 // ============================================
 model Session {
   id             String @id @default(uuid())
@@ -598,8 +543,8 @@ model Session {
   presidentId String?
   president   Member? @relation("SessionPresident", fields: [presidentId], references: [id])
 
-  observations            String? @db.Text
-  administrativeMatters   String? @db.Text
+  observations          String? @db.Text
+  administrativeMatters String? @db.Text
 
   resources     SessionResource[]
   members       SessionMember[] // Membros presentes na sessão
@@ -621,9 +566,22 @@ model Session {
   @@schema("jurfis")
 }
 
-// ============================================
-// RECURSO EM PAUTA DA SESSÃO
-// ============================================
+model SessionMember {
+  id        String  @id @default(uuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  memberId  String
+  member    Member  @relation("SessionMembersPresent", fields: [memberId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, memberId])
+  @@index([sessionId])
+  @@index([memberId])
+  @@map("CCR_SessionMember")
+  @@schema("jurfis")
+}
+
 model SessionResource {
   id         String   @id @default(uuid())
   resourceId String
@@ -655,9 +613,77 @@ model SessionResource {
   @@schema("jurfis")
 }
 
-// ============================================
-// RESULTADO DE CADA VOTAÇÃO (PRELIMINAR OU MÉRITO)
-// ============================================
+model SessionDistribution {
+  id         String   @id @default(uuid())
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  type     DistributionType // RELATOR, REVISOR
+  memberId String
+  member   Member           @relation("SessionDistributions", fields: [memberId], references: [id])
+
+  // Informações da distribuição
+  sessionId         String
+  session           Session @relation("DistributionsSessions", fields: [sessionId], references: [id])
+  distributionOrder Int
+  reason            String? @db.Text
+
+  isActive Boolean @default(true)
+
+  // Relacionamento com atas
+  minutesDistributions SessionMinutesDistribution[] @relation("MinutesDistributions")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([resourceId])
+  @@index([memberId])
+  @@index([sessionId])
+  @@index([isActive])
+  @@map("CCR_SessionDistribution")
+  @@schema("jurfis")
+}
+
+model SessionJudgment {
+  id                String          @id @default(uuid())
+  sessionResourceId String          @unique
+  sessionResource   SessionResource @relation(fields: [sessionResourceId], references: [id], onDelete: Cascade)
+
+  winningVotingResultId String
+  winningVotingResult   SessionVotingResult @relation("WinningVotingResult", fields: [winningVotingResultId], references: [id])
+
+  observations String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionResourceId])
+  @@index([winningVotingResultId])
+  @@map("CCR_SessionJudgment")
+  @@schema("jurfis")
+}
+
+model SessionVoteDecision {
+  id          String       @id @default(uuid())
+  type        DecisionType
+  code        String
+  name        String
+  description String?      @db.Text
+  isActive    Boolean      @default(true)
+
+  sessionVotingResults SessionVotingResult[] @relation("VotingResultDecisions")
+  memberVoteDecisions  SessionMemberVote[]   @relation("MemberVoteDecisions")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, code])
+  @@index([type])
+  @@index([isActive])
+  @@map("CCR_SessionVoteDecision")
+  @@schema("jurfis")
+}
+
 model SessionVotingResult {
   id                String          @id @default(uuid())
   sessionResourceId String
@@ -698,65 +724,6 @@ model SessionVotingResult {
   @@schema("jurfis")
 }
 
-// ============================================
-// DISTRIBUIÇÃO DO RECURSO (RELATOR/REVISORES)
-// ============================================
-model SessionDistribution {
-  id         String   @id @default(uuid())
-  resourceId String
-  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-
-  type     DistributionType // RELATOR, REVISOR
-  memberId String
-  member   Member           @relation("SessionDistributions", fields: [memberId], references: [id])
-
-  // Informações da distribuição
-  sessionId         String
-  session           Session @relation("DistributionsSessions", fields: [sessionId], references: [id])
-  distributionOrder Int
-  reason            String? @db.Text
-
-  isActive Boolean @default(true)
-
-  // Relacionamento com atas
-  minutesDistributions SessionMinutesDistribution[] @relation("MinutesDistributions")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([resourceId])
-  @@index([memberId])
-  @@index([sessionId])
-  @@index([isActive])
-  @@map("CCR_SessionDistribution")
-  @@schema("jurfis")
-}
-
-// ============================================
-// JULGAMENTO FINAL CONSOLIDADO
-// ============================================
-model SessionJudgment {
-  id                String          @id @default(uuid())
-  sessionResourceId String          @unique
-  sessionResource   SessionResource @relation(fields: [sessionResourceId], references: [id], onDelete: Cascade)
-
-  winningVotingResultId String
-  winningVotingResult   SessionVotingResult @relation("WinningVotingResult", fields: [winningVotingResultId], references: [id])
-
-  observations String? @db.Text
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([sessionResourceId])
-  @@index([winningVotingResultId])
-  @@map("CCR_SessionJudgment")
-  @@schema("jurfis")
-}
-
-// ============================================
-// VOTOS DOS MEMBROS NA SESSÃO
-// ============================================
 model SessionMemberVote {
   id String @id @default(uuid())
 
@@ -794,26 +761,7 @@ model SessionMemberVote {
 }
 
 // ============================================
-// MEMBROS PRESENTES NA SESSÃO
-// ============================================
-model SessionMember {
-  id        String  @id @default(uuid())
-  sessionId String
-  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  memberId  String
-  member    Member  @relation("SessionMembersPresent", fields: [memberId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  @@unique([sessionId, memberId])
-  @@index([sessionId])
-  @@index([memberId])
-  @@map("CCR_SessionMember")
-  @@schema("jurfis")
-}
-
-// ============================================
-// ATAS (MINUTES)
+// TABELA DE ATAS E RELACIONAMENTO
 // ============================================
 model SessionMinutes {
   id String @id @default(uuid())
@@ -852,33 +800,6 @@ model SessionMinutes {
   @@schema("jurfis")
 }
 
-// ============================================
-// DECISÕES PADRONIZADAS (VOTOS)
-// ============================================
-model SessionVoteDecision {
-  id          String       @id @default(uuid())
-  type        DecisionType
-  code        String
-  name        String
-  description String?      @db.Text
-  isActive    Boolean      @default(true)
-
-  sessionVotingResults SessionVotingResult[] @relation("VotingResultDecisions")
-  memberVoteDecisions  SessionMemberVote[]   @relation("MemberVoteDecisions")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([type, code])
-  @@index([type])
-  @@index([isActive])
-  @@map("CCR_SessionVoteDecision")
-  @@schema("jurfis")
-}
-
-// ============================================
-// RECURSOS DISTRIBUÍDOS NA ATA
-// ============================================
 model SessionMinutesDistribution {
   id             String              @id @default(uuid())
   minutesId      String
@@ -895,9 +816,6 @@ model SessionMinutesDistribution {
   @@schema("jurfis")
 }
 
-// ============================================
-// MEMBROS PRESENTES NA ATA
-// ============================================
 model SessionMinutesMember {
   id        String         @id @default(uuid())
   minutesId String
@@ -914,9 +832,6 @@ model SessionMinutesMember {
   @@schema("jurfis")
 }
 
-// ============================================
-// MEMBROS AUSENTES NA ATA
-// ============================================
 model SessionMinutesAbsence {
   id        String         @id @default(uuid())
   minutesId String
@@ -938,7 +853,7 @@ model SessionMinutesAbsence {
 }
 
 // ============================================
-// 5. MÓDULO DE NOTIFICAÇÕES
+// TABELA DE NOTIFICAÇÕES
 // ============================================
 model Notification {
   id         String    @id @default(uuid())
@@ -973,9 +888,6 @@ model Notification {
   @@schema("jurfis")
 }
 
-// ============================================
-// CONTATOS/CANAIS DE NOTIFICAÇÃO
-// ============================================
 model NotificationContact {
   id             String       @id @default(uuid())
   notificationId String
@@ -1008,124 +920,161 @@ model NotificationContact {
 }
 
 // ============================================
-// DOCUMENTOS
+// TABELA DE ASSUNTOS E RELACIONAMENTO
 // ============================================
-model Document {
+model Subject {
+  id          String  @id @default(uuid())
+  name        String // Nome do assunto (ex: "Isenção de IPTU", "Possui renda superior a 2 salários mínimos")
+  description String? @db.Text
+  isActive    Boolean @default(true)
+
+  // Hierarquia: Assunto principal → Subitens (motivos)
+  parentId String? // Null = assunto principal, preenchido = subitem
+  parent   Subject?  @relation("SubjectHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children Subject[] @relation("SubjectHierarchy")
+
+  // Relacionamentos com recursos
+  resourceLinks SubjectChildren[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([parentId])
+  @@map("CCR_Subject")
+  @@schema("jurfis")
+}
+
+model SubjectChildren {
   id         String   @id @default(uuid())
   resourceId String
   resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  subjectId  String
+  subject    Subject  @relation(fields: [subjectId], references: [id])
 
-  type           DocumentType
-  title          String
-  description    String?      @db.Text
-  fileName       String
-  storedFileName String
-  filePath       String
-  fileSize       Int
-  mimeType       String
+  // Marcador de assunto principal
+  isPrimary Boolean @default(false) // True = assunto principal do recurso, False = subitem/motivo
 
-  uploadedBy     String
-  uploadedByUser User     @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id])
-  uploadedAt     DateTime @default(now())
+  createdAt DateTime @default(now())
 
+  @@unique([resourceId, subjectId])
   @@index([resourceId])
-  @@index([type])
-  @@map("CCR_Document")
+  @@index([subjectId])
+  @@index([isPrimary])
+  @@map("CCR_SubjectChildren")
   @@schema("jurfis")
 }
 
 // ============================================
-// PUBLICAÇÕES
+// TABELA DE AUTORIDADES E RELACIONAMENTO
 // ============================================
-model Publication {
-  id String @id @default(uuid())
-
-  type              PublicationType
-  publicationNumber String
-  publicationDate   DateTime
-
-  resourceId String?
-  resource   Resource? @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-  sessionId  String?
-  session    Session?  @relation(fields: [sessionId], references: [id])
-
-  createdBy     String
-  createdByUser User     @relation("PublicationCreatedBy", fields: [createdBy], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([resourceId])
-  @@index([sessionId])
-  @@index([type])
-  @@index([publicationDate])
-  @@map("CCR_Publication")
-  @@schema("jurfis")
-}
-
-// ============================================
-// HISTÓRICO
-// ============================================
-model ResourceHistory {
+model Authority {
   id         String   @id @default(uuid())
   resourceId String
   resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
 
-  action      HistoryAction
-  description String        @db.Text
-  metadata    Json?
-  isManual    Boolean       @default(false)
+  type AuthorityType // Tipo de autoridade
 
-  createdBy     String
-  createdByUser User     @relation("HistoryCreatedBy", fields: [createdBy], references: [id])
-  createdAt     DateTime @default(now())
-
-  @@index([resourceId])
-  @@index([createdAt])
-  @@index([isManual])
-  @@map("CCR_ResourceHistory")
-  @@schema("jurfis")
-}
-
-// ============================================
-// ENDEREÇOS
-// ============================================
-model Address {
-  id         String   @id @default(uuid())
-  resourceId String
-  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-
-  type         AddressType
-  cep          String?
-  street       String // Rua/Logradouro
-  number       String? // Número
-  complement   String? // Complemento
-  neighborhood String? // Bairro
-  city         String // Cidade
-  state        String // Estado (UF)
-
-  isPrimary Boolean @default(false)
-  isActive  Boolean @default(true) // Endereço ativo (soft delete)
+  authorityRegisteredId String
+  authorityRegistered   AuthorityRegistered @relation(fields: [authorityRegisteredId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([resourceId])
   @@index([type])
-  @@map("CCR_Address")
+  @@index([authorityRegisteredId])
+  @@map("CCR_Authority")
+  @@schema("jurfis")
+}
+
+model AuthorityRegistered {
+  id       String  @id @default(uuid())
+  name     String // Nome completo da autoridade
+  phone    String? // Telefone
+  email    String? // Email
+  isActive Boolean @default(true)
+
+  // Relacionamentos
+  authorities Authority[] // Autoridades vinculadas aos recursos
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([name])
+  @@map("CCR_AuthorityRegistered")
+  @@schema("jurfis")
+}
+
+// ============================================
+// TABELA DE MEMBROS
+// ============================================
+model Member {
+  id           String  @id @default(uuid())
+  name         String // Nome completo do membro
+  role         String? // Cargo (ex: "Presidente", "Conselheiro Titular", etc)
+  cpf          String? // CPF
+  registration String? // Matrícula
+  agency       String? // Órgão
+  phone        String?
+  email        String?
+  gender       Gender? // MASCULINO ou FEMININO
+  isActive     Boolean @default(true)
+
+  // Relacionamentos
+  tramitations                Tramitation[]
+  sessionsAsPresident         Session[]               @relation("SessionPresident")
+  sessionsPresent             SessionMember[]         @relation("SessionMembersPresent")
+  sessionResourcesAsPresident SessionResource[]       @relation("SessionResourcePresident")
+  distributions               SessionDistribution[]   @relation("SessionDistributions")
+  votes                       SessionMemberVote[]     @relation("MemberVotes")
+  votesFollowed               SessionMemberVote[]     @relation("FollowedMembers")
+  sessionVotingResultsWon     SessionVotingResult[]   @relation("VotingResultWinners")
+  minutesAsPresident          SessionMinutes[]        @relation("MinutesPresident")
+  minutesPresent              SessionMinutesMember[]  @relation("MinutesMembersPresent")
+  minutesAbsences             SessionMinutesAbsence[] @relation("MinutesAbsences")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("CCR_Member")
+  @@schema("jurfis")
+}
+
+// ============================================
+// TABELA DE SETORES E RELACIONAMENTO
+// ============================================
+model Sector {
+  id           String  @id @default(uuid())
+  name         String  @unique // Nome completo do setor (ex: "Fiscalização", "Contencioso")
+  abbreviation String? @unique // Abreviação do setor (ex: "FISC", "CONT")
+  dispatchCode String? // Código identificador para despacho
+  description  String? @db.Text
+
+  // Informações de contato
+  phone   String?
+  email   String?
+  address String? @db.Text
+
+  isActive Boolean @default(true)
+
+  // Relacionamentos
+  tramitations  Tramitation[]
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("CCR_Sector")
   @@schema("jurfis")
 }
 
 // ============================================
 // ENUMS
 // ============================================
-enum ProtocolStatus {
-  PENDENTE
-  CONCLUIDO
-  ARQUIVADO
-
-  @@schema("jurfis")
-}
-
 enum PartRole {
   REQUERENTE
   PATRONO
@@ -1142,28 +1091,10 @@ enum ContactType {
   @@schema("jurfis")
 }
 
-enum AddressType {
-  CORRESPONDENCIA
-  RECURSO
-  OUTRO
-
-  @@schema("jurfis")
-}
-
-enum TramitationPurpose {
-  SOLICITAR_PROCESSO
-  CONTRARRAZAO
-  PARECER_PGM
-  JULGAMENTO
-  DILIGENCIA
-  OUTRO
-
-  @@schema("jurfis")
-}
-
-enum TramitationStatus {
+enum ProtocolStatus {
   PENDENTE
-  ENTREGUE
+  CONCLUIDO
+  ARQUIVADO
 
   @@schema("jurfis")
 }
@@ -1194,6 +1125,22 @@ enum ResourceType {
   @@schema("jurfis")
 }
 
+enum AddressType {
+  CORRESPONDENCIA
+  RECURSO
+  OUTRO
+
+  @@schema("jurfis")
+}
+
+enum PublicationType {
+  SESSAO
+  ACORDAO
+  CIENCIA
+
+  @@schema("jurfis")
+}
+
 enum RegistrationType {
   IMOBILIARIA
   ECONOMICA
@@ -1203,11 +1150,42 @@ enum RegistrationType {
   @@schema("jurfis")
 }
 
-enum AuthorityType {
-  AUTOR_PROCEDIMENTO_FISCAL
-  JULGADOR_SINGULAR
-  COORDENADOR
+enum TramitationPurpose {
+  SOLICITAR_PROCESSO
+  CONTRARRAZAO
+  PARECER_PGM
+  JULGAMENTO
+  DILIGENCIA
+  OUTRO
+
+  @@schema("jurfis")
+}
+
+enum TramitationStatus {
+  PENDENTE
+  ENTREGUE
+
+  @@schema("jurfis")
+}
+
+enum DocumentType {
+  RECURSO
+  CONTRARRAZAO
+  PARECER
+  VOTO
   OUTROS
+
+  @@schema("jurfis")
+}
+
+enum HistoryAction {
+  CREATED
+  UPDATED
+  STATUS_CHANGED
+  DOCUMENT_ADDED
+  SESSION_ADDED
+  NOTIFICATION_SENT
+  TRAMITATION_ADDED
 
   @@schema("jurfis")
 }
@@ -1221,10 +1199,10 @@ enum SessionType {
 }
 
 enum SessionStatus {
-  PUBLICACAO    // Aguardando publicação da pauta ou republicação após alterações
-  PENDENTE      // Pauta publicada, aguardando sessão e julgamentos
-  CONCLUIDA     // Sessão finalizada
-  CANCELADA     // Sessão cancelada
+  PUBLICACAO // Aguardando publicação da pauta ou republicação após alterações
+  PENDENTE // Pauta publicada, aguardando sessão e julgamentos
+  CONCLUIDA // Sessão finalizada
+  CANCELADA // Sessão cancelada
 
   @@schema("jurfis")
 }
@@ -1287,13 +1265,6 @@ enum VotePosition {
   @@schema("jurfis")
 }
 
-enum Gender {
-  MASCULINO
-  FEMININO
-
-  @@schema("jurfis")
-}
-
 enum NotificationType {
   ADMISSIBILIDADE
   SESSAO
@@ -1332,32 +1303,18 @@ enum NotificationChannel {
   @@schema("jurfis")
 }
 
-enum DocumentType {
-  RECURSO
-  CONTRARRAZAO
-  PARECER
-  VOTO
+enum AuthorityType {
+  AUTOR_PROCEDIMENTO_FISCAL
+  JULGADOR_SINGULAR
+  COORDENADOR
   OUTROS
 
   @@schema("jurfis")
 }
 
-enum PublicationType {
-  SESSAO
-  ACORDAO
-  CIENCIA
-
-  @@schema("jurfis")
-}
-
-enum HistoryAction {
-  CREATED
-  UPDATED
-  STATUS_CHANGED
-  DOCUMENT_ADDED
-  SESSION_ADDED
-  NOTIFICATION_SENT
-  TRAMITATION_ADDED
+enum Gender {
+  MASCULINO
+  FEMININO
 
   @@schema("jurfis")
 }

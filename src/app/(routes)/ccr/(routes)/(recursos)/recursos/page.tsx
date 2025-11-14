@@ -10,6 +10,7 @@ interface Resource {
   sequenceNumber: number;
   year: number;
   processNumber: string;
+  processName: string | null;
   status: string;
   type: string;
   createdAt: Date;
