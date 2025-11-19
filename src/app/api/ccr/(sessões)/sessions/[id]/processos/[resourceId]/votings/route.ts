@@ -31,24 +31,27 @@ export async function GET(
       );
     }
 
-    // Buscar votações
-    const votings = await prismadb.sessionVoting.findMany({
+    // Buscar TODOS os resultados das votações do processo (de todas as sessões)
+    const results = await prismadb.sessionResult.findMany({
       where: {
-        sessionResourceId: sessionResource.id,
+        resourceId: sessionResource.resourceId, // Busca pelo Resource (processo)
       },
       include: {
-        sessionResource: {
+        resource: {
           select: {
-            resource: {
-              select: {
-                processNumber: true,
-                processName: true,
-                resourceNumber: true,
-              },
-            },
+            processNumber: true,
+            processName: true,
+            resourceNumber: true,
           },
         },
-        preliminarDecision: {
+        judgedInSession: {
+          select: {
+            id: true,
+            sessionNumber: true,
+            date: true,
+          },
+        },
+        preliminaryDecision: {
           select: {
             id: true,
             identifier: true,
@@ -75,7 +78,6 @@ export async function GET(
             voteType: true,
             voteKnowledgeType: true,
             participationStatus: true,
-            votePosition: true,
             member: {
               select: {
                 id: true,
@@ -83,21 +85,28 @@ export async function GET(
                 role: true,
               },
             },
-            preliminarDecision: {
+            session: {
+              select: {
+                id: true,
+                sessionNumber: true,
+                date: true,
+              },
+            },
+            preliminaryDecision: {
               select: {
                 id: true,
                 identifier: true,
                 type: true,
               },
             },
-            meritoDecision: {
+            meritDecision: {
               select: {
                 id: true,
                 identifier: true,
                 type: true,
               },
             },
-            oficioDecision: {
+            officialDecision: {
               select: {
                 id: true,
                 identifier: true,
@@ -115,17 +124,17 @@ export async function GET(
       },
     });
 
-    // Adicionar label para cada votação
-    const votingsWithLabels = votings.map((voting) => ({
-      ...voting,
-      label: voting.preliminarDecision
-        ? `Não Conhecimento - ${voting.preliminarDecision.identifier}`
-        : voting.votingType === 'NAO_CONHECIMENTO'
+    // Adicionar label para cada resultado
+    const resultsWithLabels = results.map((result) => ({
+      ...result,
+      label: result.preliminaryDecision
+        ? `Não Conhecimento - ${result.preliminaryDecision.identifier}`
+        : result.votingType === 'NAO_CONHECIMENTO'
         ? 'Não Conhecimento'
         : 'Mérito',
     }));
 
-    return NextResponse.json(votingsWithLabels);
+    return NextResponse.json(resultsWithLabels);
   } catch (error) {
     console.log('[VOTINGS_GET]', error);
     return new NextResponse('Internal error', { status: 500 });

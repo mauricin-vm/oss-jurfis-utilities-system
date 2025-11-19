@@ -51,7 +51,6 @@ interface MemberVote {
   id: string;
   voteType: string;
   participationStatus: string;
-  votePosition: string | null;
   isQualityVote: boolean;
   justification: string | null;
   observations: string | null;
@@ -60,27 +59,30 @@ interface MemberVote {
     name: string;
     role: string;
   };
-  preliminarDecision: {
+  preliminaryDecision: {
     id: string;
     type: string;
     code: string;
     name: string;
   } | null;
-  meritoDecision: {
+  meritDecision: {
     id: string;
     type: string;
     code: string;
     name: string;
   } | null;
-  oficioDecision: {
+  officialDecision: {
     id: string;
     type: string;
     code: string;
     name: string;
   } | null;
-  followsMember: {
+  followsVote: {
     id: string;
-    name: string;
+    member: {
+      id: string;
+      name: string;
+    };
   } | null;
 }
 
@@ -91,9 +93,12 @@ interface VotingResult {
   votesInFavor: number;
   votesAgainst: number;
   abstentions: number;
+  absences: number;
+  impediments: number;
+  suspicions: number;
   qualityVoteUsed: boolean;
   finalText: string | null;
-  preliminarDecision?: {
+  preliminaryDecision?: {
     id: string;
     type: string;
     code: string;
@@ -126,7 +131,6 @@ interface SessionResource {
     name: string;
     role: string;
   } | null;
-  sessionVotings: VotingResult[];
   attendances?: Array<{
     id: string;
     partId: string | null;
@@ -261,13 +265,6 @@ const voteTypeLabels: Record<string, string> = {
   REVISOR: 'Revisor',
   PRESIDENTE: 'Presidente',
   VOTANTE: 'Votante',
-};
-
-const votePositionLabels: Record<string, string> = {
-  ACOMPANHA_RELATOR: 'Acomp. relator',
-  ACOMPANHA_REVISOR: 'Acomp. revisor',
-  VOTO_PROPRIO: 'Voto próprio',
-  ABSTENCAO: 'Abstenção',
 };
 
 // Cores para decisões (usadas nos badges de resultado)

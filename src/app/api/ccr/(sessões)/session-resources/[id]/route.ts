@@ -130,25 +130,6 @@ export async function GET(
             role: true,
           },
         },
-        sessionVotings: {
-          include: {
-            winningMember: {
-              select: {
-                id: true,
-                name: true,
-                role: true,
-              },
-            },
-          },
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
-        _count: {
-          select: {
-            sessionVotings: true,
-          },
-        },
       },
     });
 
@@ -244,11 +225,6 @@ export async function PUT(
             role: true,
           },
         },
-        _count: {
-          select: {
-            sessionVotings: true,
-          },
-        },
       },
     });
 
@@ -284,21 +260,20 @@ export async function DELETE(
       where: {
         id,
       },
-      include: {
-        _count: {
-          select: {
-            sessionVotings: true,
-          },
-        },
-      },
     });
 
     if (!sessionResource) {
       return new NextResponse('Recurso de sessão não encontrado', { status: 404 });
     }
 
-    // Não permitir exclusão se já tem resultados de votação
-    if (sessionResource._count.sessionVotings > 0) {
+    // Não permitir exclusão se já tem resultados de votação para este processo
+    const sessionResultsCount = await prismadb.sessionResult.count({
+      where: {
+        resourceId: sessionResource.resourceId,
+      },
+    });
+
+    if (sessionResultsCount > 0) {
       return new NextResponse(
         'Não é possível excluir recurso de sessão com votações registradas',
         { status: 400 }

@@ -47,16 +47,16 @@ interface SessionVoteFormProps {
   reviewersIds?: string[];
   preliminaryDecisions: VoteDecision[];
   meritDecisions: VoteDecision[];
-  oficioDecisions: VoteDecision[];
+  officialDecisions: VoteDecision[];
 }
 
 type SessionVoteFormValues = {
   memberId: string;
   voteKnowledgeType: 'NAO_CONHECIMENTO' | 'CONHECIMENTO';
-  preliminarSentido: 'ACATAR' | 'AFASTAR';
-  preliminarDecisionId: string;
-  meritoDecisionId: string;
-  oficioDecisionId: string;
+  preliminaryDecisionType: 'ACATAR' | 'AFASTAR';
+  preliminaryDecisionId: string;
+  meritDecisionId: string;
+  officialDecisionId: string;
   voteText: string;
 };
 
@@ -69,7 +69,7 @@ export function SessionVoteForm({
   reviewersIds = [],
   preliminaryDecisions,
   meritDecisions,
-  oficioDecisions,
+  officialDecisions,
 }: SessionVoteFormProps) {
   const router = useRouter();
   const params = useParams();
@@ -79,19 +79,19 @@ export function SessionVoteForm({
     defaultValues: {
       memberId: distributedToId || '',
       voteKnowledgeType: 'NAO_CONHECIMENTO',
-      preliminarSentido: 'ACATAR',
-      preliminarDecisionId: 'none',
-      meritoDecisionId: 'none',
-      oficioDecisionId: 'none',
+      preliminaryDecisionType: 'ACATAR',
+      preliminaryDecisionId: 'none',
+      meritDecisionId: 'none',
+      officialDecisionId: 'none',
       voteText: '',
     },
   });
 
   const voteKnowledgeType = form.watch('voteKnowledgeType');
-  const preliminarSentido = form.watch('preliminarSentido');
-  const preliminarDecisionId = form.watch('preliminarDecisionId');
-  const meritoDecisionId = form.watch('meritoDecisionId');
-  const oficioDecisionId = form.watch('oficioDecisionId');
+  const preliminaryDecisionType = form.watch('preliminaryDecisionType');
+  const preliminaryDecisionId = form.watch('preliminaryDecisionId');
+  const meritDecisionId = form.watch('meritDecisionId');
+  const officialDecisionId = form.watch('officialDecisionId');
 
   // Determinar tipo de voto automaticamente baseado no membro selecionado
   const getVoteType = (selectedMemberId: string): 'RELATOR' | 'REVISOR' => {
@@ -118,32 +118,32 @@ export function SessionVoteForm({
 
   // Limpar ofício quando mudar de ACATAR para AFASTAR
   useEffect(() => {
-    if (voteKnowledgeType === 'NAO_CONHECIMENTO' && preliminarSentido === 'AFASTAR') {
-      form.setValue('oficioDecisionId', 'none');
+    if (voteKnowledgeType === 'NAO_CONHECIMENTO' && preliminaryDecisionType === 'AFASTAR') {
+      form.setValue('officialDecisionId', 'none');
     }
-  }, [preliminarSentido, voteKnowledgeType]);
+  }, [preliminaryDecisionType, voteKnowledgeType]);
 
   // Atualizar texto quando decisões mudarem
   useEffect(() => {
     buildVoteText();
-  }, [preliminarSentido, preliminarDecisionId, meritoDecisionId, oficioDecisionId, voteKnowledgeType]);
+  }, [preliminaryDecisionType, preliminaryDecisionId, meritDecisionId, officialDecisionId, voteKnowledgeType]);
 
   const buildVoteText = () => {
     let text = '';
 
     if (voteKnowledgeType === 'NAO_CONHECIMENTO') {
-      const hasPreliminar = preliminarDecisionId && preliminarDecisionId !== 'none';
+      const hasPreliminar = preliminaryDecisionId && preliminaryDecisionId !== 'none';
       // Ofício só é considerado se a finalidade for ACATAR
-      const hasOficio = preliminarSentido === 'ACATAR' && oficioDecisionId && oficioDecisionId !== 'none';
+      const hasOficio = preliminaryDecisionType === 'ACATAR' && officialDecisionId && officialDecisionId !== 'none';
 
       let preliminarText = '';
       let oficioText = '';
 
       // Obter texto da preliminar
       if (hasPreliminar) {
-        const decision = preliminaryDecisions.find(d => d.id === preliminarDecisionId);
+        const decision = preliminaryDecisions.find(d => d.id === preliminaryDecisionId);
         if (decision) {
-          const textToUse = preliminarSentido === 'ACATAR' ? decision.acceptText : decision.rejectText;
+          const textToUse = preliminaryDecisionType === 'ACATAR' ? decision.acceptText : decision.rejectText;
           if (textToUse) {
             // Manter primeira letra maiúscula porque inicia a frase
             preliminarText = normalizeText(textToUse, true);
@@ -153,7 +153,7 @@ export function SessionVoteForm({
 
       // Obter texto do ofício (apenas se finalidade for ACATAR)
       if (hasOficio) {
-        const decision = oficioDecisions.find(d => d.id === oficioDecisionId);
+        const decision = officialDecisions.find(d => d.id === officialDecisionId);
         if (decision?.text) {
           // Primeira letra minúscula porque vem depois de vírgula
           oficioText = normalizeText(decision.text, false);
@@ -170,21 +170,21 @@ export function SessionVoteForm({
       } else if (!hasPreliminar && hasOficio) {
         // Regra 3: Apenas Ofício (ofício minúscula)
         text = `Não conhecer do recurso, mas, de ofício, ${oficioText}.`;
-      } else if (!hasPreliminar && !hasOficio && preliminarSentido === 'AFASTAR') {
+      } else if (!hasPreliminar && !hasOficio && preliminaryDecisionType === 'AFASTAR') {
         // Regra 4: Afastar sem preliminar específica
         text = 'Conhecer do recurso.';
       }
     } else {
       // CONHECIMENTO
-      const hasMerito = meritoDecisionId && meritoDecisionId !== 'none';
-      const hasOficio = oficioDecisionId && oficioDecisionId !== 'none';
+      const hasMerito = meritDecisionId && meritDecisionId !== 'none';
+      const hasOficio = officialDecisionId && officialDecisionId !== 'none';
 
       let meritoText = '';
       let oficioText = '';
 
       // Obter texto do mérito
       if (hasMerito) {
-        const decision = meritDecisions.find(d => d.id === meritoDecisionId);
+        const decision = meritDecisions.find(d => d.id === meritDecisionId);
         if (decision?.text) {
           // Manter primeira letra maiúscula
           meritoText = normalizeText(decision.text, true);
@@ -193,7 +193,7 @@ export function SessionVoteForm({
 
       // Obter texto do ofício
       if (hasOficio) {
-        const decision = oficioDecisions.find(d => d.id === oficioDecisionId);
+        const decision = officialDecisions.find(d => d.id === officialDecisionId);
         if (decision?.text) {
           // Primeira letra minúscula porque vem depois de vírgula
           oficioText = normalizeText(decision.text, false);
@@ -220,17 +220,17 @@ export function SessionVoteForm({
         return;
       }
 
-      if (data.voteKnowledgeType === 'CONHECIMENTO' && (!data.meritoDecisionId || data.meritoDecisionId === 'none')) {
+      if (data.voteKnowledgeType === 'CONHECIMENTO' && (!data.meritDecisionId || data.meritDecisionId === 'none')) {
         toast.error('Decisão de mérito é obrigatória para voto de conhecimento');
         return;
       }
 
       if (data.voteKnowledgeType === 'NAO_CONHECIMENTO') {
-        const hasPreliminar = data.preliminarDecisionId && data.preliminarDecisionId !== 'none';
-        const hasOficio = data.oficioDecisionId && data.oficioDecisionId !== 'none';
+        const hasPreliminar = data.preliminaryDecisionId && data.preliminaryDecisionId !== 'none';
+        const hasOficio = data.officialDecisionId && data.officialDecisionId !== 'none';
 
         // Se finalidade for ACATAR, precisa ter pelo menos Preliminar ou Ofício
-        if (data.preliminarSentido === 'ACATAR' && !hasPreliminar && !hasOficio) {
+        if (data.preliminaryDecisionType === 'ACATAR' && !hasPreliminar && !hasOficio) {
           toast.error('Para votos de não conhecimento com finalidade de acatar, selecione pelo menos uma preliminar ou uma decisão de ofício');
           return;
         }
@@ -256,9 +256,10 @@ export function SessionVoteForm({
             memberId: data.memberId,
             voteType,
             voteKnowledgeType: data.voteKnowledgeType,
-            preliminarDecisionId: data.preliminarDecisionId !== 'none' ? data.preliminarDecisionId : null,
-            meritoDecisionId: data.meritoDecisionId !== 'none' ? data.meritoDecisionId : null,
-            oficioDecisionId: data.oficioDecisionId !== 'none' ? data.oficioDecisionId : null,
+            preliminaryDecisionId: data.preliminaryDecisionId !== 'none' ? data.preliminaryDecisionId : null,
+            preliminaryDecisionType: data.voteKnowledgeType === 'NAO_CONHECIMENTO' ? data.preliminaryDecisionType : null,
+            meritDecisionId: data.meritDecisionId !== 'none' ? data.meritDecisionId : null,
+            officialDecisionId: data.officialDecisionId !== 'none' ? data.officialDecisionId : null,
             voteText: data.voteText.trim(),
           }),
         }
@@ -366,7 +367,7 @@ export function SessionVoteForm({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
                 control={form.control}
-                name="preliminarSentido"
+                name="preliminaryDecisionType"
                 render={({ field }) => (
                   <FormItem className="space-y-0">
                     <FormLabel className="block text-sm font-medium mb-1.5">
@@ -394,7 +395,7 @@ export function SessionVoteForm({
 
               <FormField
                 control={form.control}
-                name="preliminarDecisionId"
+                name="preliminaryDecisionId"
                 render={({ field }) => (
                   <FormItem className="space-y-0">
                     <FormLabel className="block text-sm font-medium mb-1.5">
@@ -426,11 +427,11 @@ export function SessionVoteForm({
             </div>
 
             {/* Ofício (apenas se finalidade for Acatar) */}
-            {preliminarSentido === 'ACATAR' && (
+            {preliminaryDecisionType === 'ACATAR' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
-                  name="oficioDecisionId"
+                  name="officialDecisionId"
                   render={({ field }) => (
                     <FormItem className="space-y-0">
                       <FormLabel className="block text-sm font-medium mb-1.5">
@@ -447,7 +448,7 @@ export function SessionVoteForm({
                           </SelectTrigger>
                           <SelectContent className="rounded-lg">
                             <SelectItem value="none">Nenhuma</SelectItem>
-                            {oficioDecisions.map((decision) => (
+                            {officialDecisions.map((decision) => (
                               <SelectItem key={decision.id} value={decision.id}>
                                 {decision.identifier}
                               </SelectItem>
@@ -469,7 +470,7 @@ export function SessionVoteForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormField
               control={form.control}
-              name="meritoDecisionId"
+              name="meritDecisionId"
               render={({ field }) => (
                 <FormItem className="space-y-0">
                   <FormLabel className="block text-sm font-medium mb-1.5">
@@ -501,7 +502,7 @@ export function SessionVoteForm({
 
             <FormField
               control={form.control}
-              name="oficioDecisionId"
+              name="officialDecisionId"
               render={({ field }) => (
                 <FormItem className="space-y-0">
                   <FormLabel className="block text-sm font-medium mb-1.5">
@@ -518,7 +519,7 @@ export function SessionVoteForm({
                       </SelectTrigger>
                       <SelectContent className="rounded-lg">
                         <SelectItem value="none">Nenhuma</SelectItem>
-                        {oficioDecisions.map((decision) => (
+                        {officialDecisions.map((decision) => (
                           <SelectItem key={decision.id} value={decision.id}>
                             {decision.identifier}
                           </SelectItem>

@@ -145,10 +145,15 @@ export async function GET(
       },
     });
 
-    // Buscar dados dos revisores
-    let reviewers: Array<{ id: string; name: string; role: string }> = [];
+    // Buscar dados dos revisores com suas distribuições
+    let reviewers: Array<{
+      id: string;
+      name: string;
+      role: string;
+      distributionDate: Date | null;
+    }> = [];
     if (distribution?.reviewersIds && distribution.reviewersIds.length > 0) {
-      reviewers = await prismadb.member.findMany({
+      const membersData = await prismadb.member.findMany({
         where: {
           id: { in: distribution.reviewersIds },
         },
@@ -158,6 +163,39 @@ export async function GET(
           role: true,
         },
       });
+
+      // Para cada revisor, buscar se ele tem uma distribuição
+      reviewers = await Promise.all(
+        membersData.map(async (member) => {
+          // Buscar distribuição onde este membro foi o distributedTo
+          const memberDistribution = await prismadb.sessionDistribution.findFirst({
+            where: {
+              resourceId: sessionResource.resource.id,
+              distributedToId: member.id,
+              isActive: true,
+            },
+            include: {
+              session: {
+                select: {
+                  date: true,
+                },
+              },
+            },
+            orderBy: {
+              session: {
+                date: 'asc',
+              },
+            },
+          });
+
+          return {
+            id: member.id,
+            name: member.name,
+            role: member.role,
+            distributionDate: memberDistribution?.session.date || null,
+          };
+        })
+      );
     }
 
     // Buscar decisões disponíveis
@@ -181,7 +219,7 @@ export async function GET(
       },
     });
 
-    const oficioDecisions = await prismadb.sessionVoteDecision.findMany({
+    const officialDecisions = await prismadb.sessionVoteDecision.findMany({
       where: {
         type: 'OFICIO',
         isActive: true,
@@ -198,7 +236,7 @@ export async function GET(
       reviewers,
       preliminaryDecisions,
       meritDecisions,
-      oficioDecisions,
+      officialDecisions,
     });
   } catch (error) {
     console.error('Erro ao buscar dados para julgamento:', error);

@@ -21,9 +21,10 @@ export async function POST(
       memberId,
       voteType,
       voteKnowledgeType,
-      preliminarDecisionId,
-      meritoDecisionId,
-      oficioDecisionId,
+      preliminaryDecisionId,
+      preliminaryDecisionType,
+      meritDecisionId,
+      officialDecisionId,
       voteText,
     } = body;
 
@@ -35,7 +36,7 @@ export async function POST(
       );
     }
 
-    if (voteKnowledgeType === 'CONHECIMENTO' && !meritoDecisionId) {
+    if (voteKnowledgeType === 'CONHECIMENTO' && !meritDecisionId) {
       return NextResponse.json(
         { error: 'Decisão de mérito é obrigatória para votos de conhecimento' },
         { status: 400 }
@@ -81,7 +82,7 @@ export async function POST(
           sessionResourceId: sessionResource.id,
           memberId,
           voteKnowledgeType: 'NAO_CONHECIMENTO',
-          preliminarDecisionId: preliminarDecisionId || null,
+          preliminaryDecisionId: preliminaryDecisionId || null,
         },
       });
 
@@ -102,9 +103,10 @@ export async function POST(
         voteType,
         participationStatus: 'PRESENTE',
         voteKnowledgeType,
-        preliminarDecisionId: preliminarDecisionId || null,
-        meritoDecisionId: meritoDecisionId || null,
-        oficioDecisionId: oficioDecisionId || null,
+        preliminaryDecisionId: preliminaryDecisionId || null,
+        preliminaryDecisionType: preliminaryDecisionType || null,
+        meritDecisionId: meritDecisionId || null,
+        officialDecisionId: officialDecisionId || null,
         voteText,
       },
       include: {
@@ -115,19 +117,19 @@ export async function POST(
             role: true,
           },
         },
-        preliminarDecision: {
+        preliminaryDecision: {
           select: {
             id: true,
             identifier: true,
           },
         },
-        meritoDecision: {
+        meritDecision: {
           select: {
             id: true,
             identifier: true,
           },
         },
-        oficioDecision: {
+        officialDecision: {
           select: {
             id: true,
             identifier: true,
@@ -169,15 +171,25 @@ export async function POST(
 // Função auxiliar para agrupar votos automaticamente
 async function autoGroupVotes(sessionResourceId: string) {
   try {
+    // Buscar SessionResource para obter o resourceId
+    const sessionResource = await prismadb.sessionResource.findUnique({
+      where: { id: sessionResourceId },
+      select: { resourceId: true },
+    });
+
+    if (!sessionResource) {
+      return;
+    }
+
     // Buscar votos não vinculados
     const votes = await prismadb.sessionVote.findMany({
       where: {
         sessionResourceId,
-        sessionVotingId: null,
+        sessionResultId: null,
       },
       include: {
-        preliminarDecision: true,
-        meritoDecision: true,
+        preliminaryDecision: true,
+        meritDecision: true,
       },
     });
 
@@ -187,43 +199,43 @@ async function autoGroupVotes(sessionResourceId: string) {
 
     // Criar votações de Não Conhecimento com preliminar
     const preliminaryVotes = votes.filter(
-      (v) => v.voteKnowledgeType === 'NAO_CONHECIMENTO' && v.preliminarDecisionId
+      (v) => v.voteKnowledgeType === 'NAO_CONHECIMENTO' && v.preliminaryDecisionId
     );
 
     const preliminaryGroups = new Map<string, typeof votes>();
     preliminaryVotes.forEach((vote) => {
-      const key = vote.preliminarDecisionId!;
+      const key = vote.preliminaryDecisionId!;
       if (!preliminaryGroups.has(key)) {
         preliminaryGroups.set(key, []);
       }
       preliminaryGroups.get(key)!.push(vote);
     });
 
-    for (const [preliminarDecisionId, groupVotes] of preliminaryGroups) {
+    for (const [preliminaryDecisionId, groupVotes] of preliminaryGroups) {
       // Verificar se já existe uma votação para esta preliminar
-      const existingVoting = await prismadb.sessionVoting.findFirst({
+      const existingResult = await prismadb.sessionResult.findFirst({
         where: {
-          sessionResourceId,
+          resourceId: sessionResource.resourceId,
           votingType: 'NAO_CONHECIMENTO',
-          preliminarDecisionId,
+          preliminaryDecisionId,
           status: 'PENDENTE',
         },
       });
 
-      let votingId: string;
+      let resultId: string;
 
-      if (existingVoting) {
-        votingId = existingVoting.id;
+      if (existingResult) {
+        resultId = existingResult.id;
       } else {
-        const voting = await prismadb.sessionVoting.create({
+        const result = await prismadb.sessionResult.create({
           data: {
-            sessionResourceId,
+            resourceId: sessionResource.resourceId,
             votingType: 'NAO_CONHECIMENTO',
-            preliminarDecisionId,
+            preliminaryDecisionId,
             status: 'PENDENTE',
           },
         });
-        votingId = voting.id;
+        resultId = result.id;
       }
 
       // Vincular votos à votação
@@ -232,39 +244,39 @@ async function autoGroupVotes(sessionResourceId: string) {
           id: { in: groupVotes.map((v) => v.id) },
         },
         data: {
-          sessionVotingId: votingId,
+          sessionResultId: resultId,
         },
       });
     }
 
     // Criar votação de Não Conhecimento sem preliminar
     const naoConhecimentoSemPreliminar = votes.filter(
-      (v) => v.voteKnowledgeType === 'NAO_CONHECIMENTO' && !v.preliminarDecisionId
+      (v) => v.voteKnowledgeType === 'NAO_CONHECIMENTO' && !v.preliminaryDecisionId
     );
 
     if (naoConhecimentoSemPreliminar.length > 0) {
-      const existingVoting = await prismadb.sessionVoting.findFirst({
+      const existingResult = await prismadb.sessionResult.findFirst({
         where: {
-          sessionResourceId,
+          resourceId: sessionResource.resourceId,
           votingType: 'NAO_CONHECIMENTO',
-          preliminarDecisionId: null,
+          preliminaryDecisionId: null,
           status: 'PENDENTE',
         },
       });
 
-      let votingId: string;
+      let resultId: string;
 
-      if (existingVoting) {
-        votingId = existingVoting.id;
+      if (existingResult) {
+        resultId = existingResult.id;
       } else {
-        const voting = await prismadb.sessionVoting.create({
+        const result = await prismadb.sessionResult.create({
           data: {
-            sessionResourceId,
+            resourceId: sessionResource.resourceId,
             votingType: 'NAO_CONHECIMENTO',
             status: 'PENDENTE',
           },
         });
-        votingId = voting.id;
+        resultId = result.id;
       }
 
       await prismadb.sessionVote.updateMany({
@@ -272,7 +284,7 @@ async function autoGroupVotes(sessionResourceId: string) {
           id: { in: naoConhecimentoSemPreliminar.map((v) => v.id) },
         },
         data: {
-          sessionVotingId: votingId,
+          sessionResultId: resultId,
         },
       });
     }
@@ -281,27 +293,27 @@ async function autoGroupVotes(sessionResourceId: string) {
     const meritoVotes = votes.filter((v) => v.voteKnowledgeType === 'CONHECIMENTO');
 
     if (meritoVotes.length > 0) {
-      const existingVoting = await prismadb.sessionVoting.findFirst({
+      const existingResult = await prismadb.sessionResult.findFirst({
         where: {
-          sessionResourceId,
+          resourceId: sessionResource.resourceId,
           votingType: 'MERITO',
           status: 'PENDENTE',
         },
       });
 
-      let votingId: string;
+      let resultId: string;
 
-      if (existingVoting) {
-        votingId = existingVoting.id;
+      if (existingResult) {
+        resultId = existingResult.id;
       } else {
-        const voting = await prismadb.sessionVoting.create({
+        const result = await prismadb.sessionResult.create({
           data: {
-            sessionResourceId,
+            resourceId: sessionResource.resourceId,
             votingType: 'MERITO',
             status: 'PENDENTE',
           },
         });
-        votingId = voting.id;
+        resultId = result.id;
       }
 
       await prismadb.sessionVote.updateMany({
@@ -309,7 +321,7 @@ async function autoGroupVotes(sessionResourceId: string) {
           id: { in: meritoVotes.map((v) => v.id) },
         },
         data: {
-          sessionVotingId: votingId,
+          sessionResultId: resultId,
         },
       });
     }
@@ -347,10 +359,13 @@ export async function GET(
       );
     }
 
-    // Buscar votos
+    // Buscar TODOS os votos do processo (de todas as sessões)
+    // Busca por todas as sessões onde o processo foi pautado
     const votes = await prismadb.sessionVote.findMany({
       where: {
-        sessionResourceId: sessionResource.id,
+        sessionResource: {
+          resourceId: sessionResource.resourceId, // Busca pelo Resource (processo)
+        },
       },
       include: {
         member: {
@@ -360,21 +375,28 @@ export async function GET(
             role: true,
           },
         },
-        preliminarDecision: {
+        session: {
+          select: {
+            id: true,
+            sessionNumber: true,
+            date: true,
+          },
+        },
+        preliminaryDecision: {
           select: {
             id: true,
             identifier: true,
             type: true,
           },
         },
-        meritoDecision: {
+        meritDecision: {
           select: {
             id: true,
             identifier: true,
             type: true,
           },
         },
-        oficioDecision: {
+        officialDecision: {
           select: {
             id: true,
             identifier: true,

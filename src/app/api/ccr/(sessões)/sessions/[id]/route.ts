@@ -61,35 +61,6 @@ export async function GET(
                 },
               },
             },
-            sessionVotings: {
-              include: {
-                preliminarDecision: true,
-                winningMember: true,
-                votes: {
-                  include: {
-                    member: {
-                      select: {
-                        id: true,
-                        name: true,
-                        role: true,
-                      },
-                    },
-                    preliminarDecision: true,
-                    meritoDecision: true,
-                    oficioDecision: true,
-                    followsMember: {
-                      select: {
-                        id: true,
-                        name: true,
-                      },
-                    },
-                  },
-                  orderBy: {
-                    createdAt: 'asc',
-                  },
-                },
-              },
-            },
           },
           orderBy: {
             order: 'asc',

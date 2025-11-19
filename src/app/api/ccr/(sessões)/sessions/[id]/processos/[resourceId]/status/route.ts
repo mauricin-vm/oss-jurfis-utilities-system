@@ -44,7 +44,6 @@ export async function PATCH(
       where: { id: resourceId },
       include: {
         resource: true,
-        judgment: true,
       },
     });
 
@@ -78,46 +77,37 @@ export async function PATCH(
       updateData.diligenceDaysDeadline = null;
     }
 
-    // Se marcar como JULGADO, criar SessionJudgment se não existir
-    if (status === 'JULGADO' && !sessionResource.judgment) {
-      // Buscar votações para determinar a vencedora
-      const votingResults = await prismadb.sessionVotingResult.findMany({
+    // Se marcar como JULGADO, validar se há resultados concluídos
+    if (status === 'JULGADO') {
+      // Buscar resultados de votação para validar
+      const results = await prismadb.sessionResult.findMany({
         where: {
           sessionResourceId: resourceId,
         },
         include: {
-          memberVotes: true,
+          votes: true,
         },
         orderBy: {
           createdAt: 'desc',
         },
       });
 
-      if (votingResults.length === 0) {
+      if (results.length === 0) {
         return NextResponse.json(
-          { error: 'Não é possível finalizar julgamento sem votações registradas' },
+          { error: 'Não é possível finalizar julgamento sem resultados de votação registrados' },
           { status: 400 }
         );
       }
 
-      // Por simplicidade, usar a última votação de mérito como vencedora
-      const meritVoting = votingResults.find(v => v.type === 'MERITO');
+      // Verificar se há votação de mérito concluída
+      const meritResult = results.find(v => v.votingType === 'MERITO' && v.status === 'CONCLUIDA');
 
-      if (!meritVoting) {
+      if (!meritResult) {
         return NextResponse.json(
-          { error: 'Não é possível finalizar julgamento sem votação de mérito' },
+          { error: 'Não é possível finalizar julgamento sem resultado de mérito concluído' },
           { status: 400 }
         );
       }
-
-      // Criar SessionJudgment
-      await prismadb.sessionJudgment.create({
-        data: {
-          sessionResourceId: resourceId,
-          winningVotingResultId: meritVoting.id,
-          observations: minutesText || null,
-        },
-      });
 
       // Atualizar status do Resource para PUBLICACAO_ACORDAO
       await prismadb.resource.update({

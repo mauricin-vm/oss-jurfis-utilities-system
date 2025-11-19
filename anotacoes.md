@@ -25,3 +25,6 @@
 
 - na página de presenças no julgamento, no navegador superior (página que estamos), colocar o n. da sessão na parte de Sessão
 
+
+
+- na página de detalhes da votação, corrigir mostrar/ocultar presidente que ainda ta errado

@@ -414,6 +414,7 @@ export default function AdicionarProcessoPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                {/* Primeira linha: Número do Processo e Status */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-0">
                     <label className="block text-sm font-medium mb-1.5">Número do Processo</label>
@@ -430,13 +431,17 @@ export default function AdicionarProcessoPage() {
                     <Badge
                       variant="secondary"
                       className={cn(
-                        getResourceStatusColor(selectedResource.status),
-                        'hover:bg-opacity-100'
+                        getResourceStatusColor(selectedResource.status).replace(/border-\S+/, ''),
+                        'w-fit'
                       )}
                     >
                       {getResourceStatusLabel(selectedResource.status)}
                     </Badge>
                   </div>
+                </div>
+
+                {/* Segunda linha: Número do Recurso e Razão Social */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-0">
                     <label className="block text-sm font-medium mb-1.5">Número do Recurso</label>
                     <p className="text-sm">{selectedResource.resourceNumber}</p>

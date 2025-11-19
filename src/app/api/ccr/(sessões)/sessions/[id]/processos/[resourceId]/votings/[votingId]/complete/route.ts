@@ -30,6 +30,9 @@ export async function PATCH(
       votesInFavor,
       votesAgainst,
       abstentions,
+      absences,
+      impediments,
+      suspicions,
     } = body;
 
     // Validações
@@ -40,24 +43,24 @@ export async function PATCH(
       );
     }
 
-    // Verificar se a votação existe
-    const voting = await prismadb.sessionVoting.findUnique({
+    // Verificar se o resultado existe
+    const result = await prismadb.sessionResult.findUnique({
       where: { id: votingId },
       include: {
         votes: true,
       },
     });
 
-    if (!voting) {
-      return NextResponse.json({ error: 'Votação não encontrada' }, { status: 404 });
+    if (!result) {
+      return NextResponse.json({ error: 'Resultado não encontrado' }, { status: 404 });
     }
 
-    if (voting.status === 'CONCLUIDA') {
+    if (result.status === 'CONCLUIDA') {
       return NextResponse.json({ error: 'Votação já foi concluída' }, { status: 400 });
     }
 
     // Verificar se o membro vencedor fez parte da votação
-    const winningVote = voting.votes.find((v) => v.memberId === winningMemberId);
+    const winningVote = result.votes.find((v) => v.memberId === winningMemberId);
     if (!winningVote) {
       return NextResponse.json(
         { error: 'Membro vencedor não está entre os votos desta votação' },
@@ -65,11 +68,13 @@ export async function PATCH(
       );
     }
 
-    // Atualizar a votação
-    const updatedVoting = await prismadb.sessionVoting.update({
+    // Atualizar o resultado
+    const updatedResult = await prismadb.sessionResult.update({
       where: { id: votingId },
       data: {
         status: 'CONCLUIDA',
+        judgedInSessionId: sessionId, // Registra em qual sessão foi julgado
+        completedAt: new Date(), // Registra data/hora da conclusão
         winningVoteId: winningVote.id,
         winningMemberId,
         qualityVoteUsed,
@@ -78,10 +83,13 @@ export async function PATCH(
         totalVotes,
         votesInFavor,
         votesAgainst,
-        abstentions,
+        abstentions: abstentions || 0,
+        absences: absences || 0,
+        impediments: impediments || 0,
+        suspicions: suspicions || 0,
       },
       include: {
-        preliminarDecision: {
+        preliminaryDecision: {
           select: {
             id: true,
             identifier: true,
@@ -111,21 +119,21 @@ export async function PATCH(
                 role: true,
               },
             },
-            preliminarDecision: {
+            preliminaryDecision: {
               select: {
                 id: true,
                 identifier: true,
                 type: true,
               },
             },
-            meritoDecision: {
+            meritDecision: {
               select: {
                 id: true,
                 identifier: true,
                 type: true,
               },
             },
-            oficioDecision: {
+            officialDecision: {
               select: {
                 id: true,
                 identifier: true,
@@ -141,16 +149,16 @@ export async function PATCH(
     });
 
     // Adicionar label
-    const votingWithLabel = {
-      ...updatedVoting,
-      label: updatedVoting.preliminarDecision
-        ? `Não Conhecimento - ${updatedVoting.preliminarDecision.identifier}`
-        : updatedVoting.votingType === 'NAO_CONHECIMENTO'
+    const resultWithLabel = {
+      ...updatedResult,
+      label: updatedResult.preliminaryDecision
+        ? `Não Conhecimento - ${updatedResult.preliminaryDecision.identifier}`
+        : updatedResult.votingType === 'NAO_CONHECIMENTO'
         ? 'Não Conhecimento'
         : 'Mérito',
     };
 
-    return NextResponse.json(votingWithLabel);
+    return NextResponse.json(resultWithLabel);
   } catch (error) {
     console.log('[VOTING_COMPLETE_PATCH]', error);
     return new NextResponse('Internal error', { status: 500 });

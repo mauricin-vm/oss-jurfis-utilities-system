@@ -52,7 +52,7 @@ interface JudgmentData {
     type: string;
     text?: string | null;
   }>;
-  oficioDecisions: Array<{
+  officialDecisions: Array<{
     id: string;
     identifier: string;
     type: string;
@@ -200,7 +200,7 @@ export default function NovoVotoPage() {
             reviewersIds={data.reviewers.map(r => r.id)}
             preliminaryDecisions={data.preliminaryDecisions}
             meritDecisions={data.meritDecisions}
-            oficioDecisions={data.oficioDecisions}
+            officialDecisions={data.officialDecisions}
           />
         </CardContent>
       </Card>

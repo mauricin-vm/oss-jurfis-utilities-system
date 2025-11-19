@@ -130,11 +130,6 @@ export async function GET(req: Request) {
             role: true,
           },
         },
-        _count: {
-          select: {
-            sessionVotings: true,
-          },
-        },
       },
       orderBy: {
         order: 'asc',
@@ -296,11 +291,6 @@ export async function POST(req: Request) {
             id: true,
             name: true,
             role: true,
-          },
-        },
-        _count: {
-          select: {
-            sessionVotings: true,
           },
         },
       },

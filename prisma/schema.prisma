@@ -302,16 +302,17 @@ model Resource {
 
   // Relacionamentos
   // Partes são acessadas via processNumber: Part.findMany({ where: { processNumber } })
-  subjects      SubjectChildren[] // Assuntos do recurso (many-to-many com hierarquia)
-  registrations Registration[] // Inscrições e valores do recurso
-  authorities   Authority[] // Autoridades vinculadas ao recurso
-  addresses     Address[] // Endereços vinculados ao recurso
-  sessions      SessionResource[]
-  distributions SessionDistribution[]
-  documents     Document[]
-  publications  Publication[]
-  history       ResourceHistory[]
-  notifications Notification[]
+  subjects       SubjectChildren[] // Assuntos do recurso (many-to-many com hierarquia)
+  registrations  Registration[] // Inscrições e valores do recurso
+  authorities    Authority[] // Autoridades vinculadas ao recurso
+  addresses      Address[] // Endereços vinculados ao recurso
+  sessions       SessionResource[]
+  distributions  SessionDistribution[]
+  documents      Document[]
+  publications   Publication[]
+  history        ResourceHistory[]
+  notifications  Notification[]
+  sessionResults SessionResult[]   @relation("ResourceSessionResults") // Resultados de votações do processo
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -581,12 +582,13 @@ model Session {
   observations          String? @db.Text
   administrativeMatters String? @db.Text
 
-  resources     SessionResource[]
-  members       SessionMember[] // Membros presentes na sessão
-  distributions SessionDistribution[] @relation("DistributionsSessions")
-  minutes       SessionMinutes? // Ata da sessão (gerada após a sessão)
-  publications Publication[] // Publicações da pauta (type=SESSAO) e outros documentos
-  sessionVotes SessionVote[] @relation("VotesInSession") // Votos individuais
+  resources      SessionResource[]
+  members        SessionMember[] // Membros presentes na sessão
+  distributions  SessionDistribution[] @relation("DistributionsSessions")
+  minutes        SessionMinutes? // Ata da sessão (gerada após a sessão)
+  publications   Publication[] // Publicações da pauta (type=SESSAO) e outros documentos
+  sessionVotes   SessionVote[]         @relation("VotesInSession") // Votos individuais
+  resultsJudged  SessionResult[]       @relation("SessionResultsJudged") // Resultados julgados nesta sessão
 
   createdBy     String
   createdByUser User     @relation("SessionCreatedBy", fields: [createdBy], references: [id])
@@ -672,9 +674,8 @@ model SessionResource {
   viewRequestedBy   Member? @relation("SessionResourceViewRequests", fields: [viewRequestedById], references: [id])
 
   // Relacionamentos
-  sessionVotes   SessionVote[]                   // Votos individuais
-  sessionVotings SessionVoting[]                 // Votações consolidadas
-  attendances    SessionResourceAttendance[]     // Presenças de partes no julgamento
+  sessionVotes SessionVote[]                 @relation("SessionResourceVotes") // Votos individuais no contexto desta sessão
+  attendances  SessionResourceAttendance[] // Presenças de partes no julgamento
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -740,7 +741,7 @@ model SessionVoteDecision {
   votePreliminarDecisions   SessionVote[]   @relation("VotePreliminarDecisions")
   voteMeritoDecisions       SessionVote[]   @relation("VoteMeritoDecisions")
   voteOficioDecisions       SessionVote[]   @relation("VoteOficioDecisions")
-  votingPreliminarDecisions SessionVoting[] @relation("VotingPreliminarDecisions")
+  votingPreliminarDecisions SessionResult[] @relation("VotingPreliminarDecisions")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -752,48 +753,46 @@ model SessionVoteDecision {
   @@schema("jurfis")
 }
 
-
-// ============================================
-// NOVAS TABELAS DE VOTAÇÃO
-// ============================================
-
 // Tabela de votos individuais (como cada membro votou)
 model SessionVote {
   id                String          @id @default(uuid())
   sessionResourceId String
-  sessionResource   SessionResource @relation(fields: [sessionResourceId], references: [id], onDelete: Cascade)
+  sessionResource   SessionResource @relation("SessionResourceVotes", fields: [sessionResourceId], references: [id], onDelete: Cascade)
 
-  memberId  String
-  member    Member  @relation("MemberSessionVotes", fields: [memberId], references: [id])
+  memberId String
+  member   Member @relation("MemberSessionVotes", fields: [memberId], references: [id])
 
   sessionId String
   session   Session @relation("VotesInSession", fields: [sessionId], references: [id])
 
   voteType            VoteType
   participationStatus ParticipationStatus
-  votePosition        VotePosition?
-  followsMemberId     String?
-  followsMember       Member?         @relation("FollowedMemberVotes", fields: [followsMemberId], references: [id])
+
+  // Voto que está sendo seguido (ao invés de followsMemberId)
+  followsVoteId   String?
+  followsVote     SessionVote?  @relation("FollowedVotes", fields: [followsVoteId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  votesFollowing  SessionVote[] @relation("FollowedVotes")
 
   // Tipo de conhecimento
   voteKnowledgeType String // "NAO_CONHECIMENTO" | "CONHECIMENTO"
 
   // Decisões selecionadas (IDs dos modelos padrão)
-  preliminarDecisionId String?
-  preliminarDecision   SessionVoteDecision? @relation("VotePreliminarDecisions", fields: [preliminarDecisionId], references: [id])
+  preliminaryDecisionId   String?
+  preliminaryDecision     SessionVoteDecision? @relation("VotePreliminarDecisions", fields: [preliminaryDecisionId], references: [id])
+  preliminaryDecisionType String? // "ACATAR" | "AFASTAR" - Sentido da preliminar para votos de não conhecimento
 
-  meritoDecisionId String?
-  meritoDecision   SessionVoteDecision? @relation("VoteMeritoDecisions", fields: [meritoDecisionId], references: [id])
+  meritDecisionId String?
+  meritDecision   SessionVoteDecision? @relation("VoteMeritoDecisions", fields: [meritDecisionId], references: [id])
 
-  oficioDecisionId String?
-  oficioDecision   SessionVoteDecision? @relation("VoteOficioDecisions", fields: [oficioDecisionId], references: [id])
+  officialDecisionId String?
+  officialDecision   SessionVoteDecision? @relation("VoteOficioDecisions", fields: [officialDecisionId], references: [id])
 
   // Texto único consolidado (preliminar + mérito + ofício)
   voteText String? @db.Text
 
-  // Vínculo com votação (preenchido quando votação for concluída)
-  sessionVotingId String?
-  sessionVoting   SessionVoting? @relation(fields: [sessionVotingId], references: [id])
+  // Vínculo com resultado (preenchido quando votação for concluída)
+  sessionResultId String?
+  sessionResult   SessionResult? @relation(fields: [sessionResultId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -801,39 +800,49 @@ model SessionVote {
   @@index([sessionResourceId])
   @@index([memberId])
   @@index([sessionId])
-  @@index([sessionVotingId])
-  @@index([preliminarDecisionId])
-  @@index([meritoDecisionId])
-  @@index([oficioDecisionId])
-  @@index([followsMemberId])
+  @@index([sessionResultId])
+  @@index([preliminaryDecisionId])
+  @@index([meritDecisionId])
+  @@index([officialDecisionId])
+  @@index([followsVoteId])
   @@map("CCR_SessionVote")
   @@schema("jurfis")
 }
 
-// Tabela de votações (resultado consolidado)
-model SessionVoting {
-  id                String          @id @default(uuid())
-  sessionResourceId String
-  sessionResource   SessionResource @relation(fields: [sessionResourceId], references: [id], onDelete: Cascade)
+// Tabela de resultados (resultado consolidado da votação)
+model SessionResult {
+  id         String   @id @default(uuid())
+  resourceId String   // Vinculado ao processo (Resource) para agregar votos de múltiplas sessões
+  resource   Resource @relation("ResourceSessionResults", fields: [resourceId], references: [id], onDelete: Cascade)
 
   votingType String // "NAO_CONHECIMENTO", "CONHECIMENTO", "MERITO"
 
   // Se for votação de não conhecimento com preliminar específica
-  preliminarDecisionId String?
-  preliminarDecision   SessionVoteDecision? @relation("VotingPreliminarDecisions", fields: [preliminarDecisionId], references: [id])
+  preliminaryDecisionId String?
+  preliminaryDecision   SessionVoteDecision? @relation("VotingPreliminarDecisions", fields: [preliminaryDecisionId], references: [id])
 
   // Status da votação
   status String @default("PENDENTE") // "PENDENTE", "CONCLUIDA"
+
+  // Sessão onde a votação foi concluída/julgada
+  judgedInSessionId String?
+  judgedInSession   Session? @relation("SessionResultsJudged", fields: [judgedInSessionId], references: [id])
 
   // Resultado (quando concluída)
   winningVoteId   String?
   winningMemberId String?
   winningMember   Member? @relation("VotingWinnerMembers", fields: [winningMemberId], references: [id])
 
-  totalVotes   Int @default(0)
-  votesInFavor Int @default(0)
-  votesAgainst Int @default(0)
-  abstentions  Int @default(0)
+  // Contagem de votos
+  totalVotes   Int @default(0) // Total de votos válidos (favor + contra)
+  votesInFavor Int @default(0) // Votos a favor
+  votesAgainst Int @default(0) // Votos contra
+
+  // Contagem de participação
+  abstentions Int @default(0) // Abstenções (presente mas não votou)
+  absences    Int @default(0) // Ausentes
+  impediments Int @default(0) // Impedidos
+  suspicions  Int @default(0) // Suspeitos
 
   // Voto de qualidade
   qualityVoteUsed     Boolean @default(false)
@@ -843,23 +852,25 @@ model SessionVoting {
   // Texto final consolidado
   finalText String? @db.Text
 
-  // Votos relacionados
+  // Votos relacionados (de múltiplas sessões)
   votes SessionVote[]
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   completedAt DateTime?
 
-  @@index([sessionResourceId])
+  // Garantir apenas um resultado por tipo de votação + preliminar (se houver) por processo
+  @@unique([resourceId, votingType, preliminaryDecisionId])
+  @@index([resourceId])
   @@index([votingType])
   @@index([status])
-  @@index([preliminarDecisionId])
+  @@index([preliminaryDecisionId])
+  @@index([judgedInSessionId])
   @@index([winningMemberId])
   @@index([qualityVoteMemberId])
-  @@map("CCR_SessionVoting")
+  @@map("CCR_SessionResult")
   @@schema("jurfis")
 }
-
 
 // ============================================
 // TABELA DE ATAS E RELACIONAMENTO
@@ -1129,16 +1140,15 @@ model Member {
   sessionsPresent             SessionMember[]         @relation("SessionMembersPresent")
   sessionResourcesAsPresident SessionResource[]       @relation("SessionResourcePresident")
   sessionResourceViewRequests SessionResource[]       @relation("SessionResourceViewRequests")
-  distributionsAsFirst SessionDistribution[] @relation("DistributionFirstMember")
-  minutesAsPresident   SessionMinutes[]      @relation("MinutesPresident")
+  distributionsAsFirst        SessionDistribution[]   @relation("DistributionFirstMember")
+  minutesAsPresident          SessionMinutes[]        @relation("MinutesPresident")
   minutesPresent              SessionMinutesMember[]  @relation("MinutesMembersPresent")
   minutesAbsences             SessionMinutesAbsence[] @relation("MinutesAbsences")
 
   // Novos relacionamentos
-  sessionVotes                SessionVote[]           @relation("MemberSessionVotes")
-  sessionVotesFollowed        SessionVote[]           @relation("FollowedMemberVotes")
-  votingsWon                  SessionVoting[]         @relation("VotingWinnerMembers")
-  qualityVotesGiven           SessionVoting[]         @relation("QualityVoteMembers")
+  sessionVotes      SessionVote[]   @relation("MemberSessionVotes")
+  votingsWon        SessionResult[] @relation("VotingWinnerMembers")
+  qualityVotesGiven SessionResult[] @relation("QualityVoteMembers")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1358,14 +1368,6 @@ enum ParticipationStatus {
   AUSENTE
   IMPEDIDO
   SUSPEITO
-
-  @@schema("jurfis")
-}
-
-enum VotePosition {
-  ACOMPANHA_RELATOR
-  ACOMPANHA_REVISOR
-  VOTO_PROPRIO
   ABSTENCAO
 
   @@schema("jurfis")

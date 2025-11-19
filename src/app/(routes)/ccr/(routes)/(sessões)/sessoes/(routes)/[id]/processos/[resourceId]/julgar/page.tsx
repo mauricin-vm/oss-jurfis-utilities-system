@@ -95,9 +95,14 @@ interface SessionVote {
   voteType: string;
   voteKnowledgeType: string;
   voteText: string;
-  preliminarDecision?: { id: string; identifier: string; type: string } | null;
-  meritoDecision?: { id: string; identifier: string; type: string } | null;
-  oficioDecision?: { id: string; identifier: string; type: string } | null;
+  session?: {
+    id: string;
+    sessionNumber: string;
+    date: Date;
+  };
+  preliminaryDecision?: { id: string; identifier: string; type: string } | null;
+  meritDecision?: { id: string; identifier: string; type: string } | null;
+  officialDecision?: { id: string; identifier: string; type: string } | null;
   createdAt: Date;
 }
 
@@ -126,10 +131,10 @@ interface JudgmentData {
     members: SessionMember[];
   };
   distribution: Distribution | null;
-  reviewers: Array<{ id: string; name: string; role: string }>;
+  reviewers: Array<{ id: string; name: string; role: string; distributionDate: Date | null }>;
   preliminaryDecisions: Decision[];
   meritDecisions: Decision[];
-  oficioDecisions: Decision[];
+  officialDecisions: Decision[];
 }
 
 const authorityTypeLabels: Record<string, string> = {
@@ -165,7 +170,7 @@ export default function JulgarProcessoPage() {
   const [saving, setSaving] = useState(false);
   const [data, setData] = useState<JudgmentData | null>(null);
   const [sessionVotes, setSessionVotes] = useState<SessionVote[]>([]);
-  const [sessionVotings, setSessionVotings] = useState<any[]>([]);
+  const [sessionResults, setSessionResults] = useState<any[]>([]);
   const [groupedVotings, setGroupedVotings] = useState<any[]>([]);
 
   // Campos para atualizar status
@@ -191,6 +196,8 @@ export default function JulgarProcessoPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
+
+      // Primeira chamada - dados principais
       const response = await fetch(
         `/api/ccr/sessions/${params.id}/processos/${params.resourceId}/julgar`
       );
@@ -198,7 +205,13 @@ export default function JulgarProcessoPage() {
       if (response.ok) {
         const result = await response.json();
         setData(result);
-        await fetchSessionVotes();
+
+        // Fazer as 3 chamadas restantes em paralelo
+        await Promise.all([
+          fetchSessionVotes(),
+          fetchSessionResults(),
+          fetchGroupedVotings()
+        ]);
       } else {
         toast.error('Erro ao carregar dados do processo');
       }
@@ -219,19 +232,13 @@ export default function JulgarProcessoPage() {
       if (response.ok) {
         const votes = await response.json();
         setSessionVotes(votes);
-
-        // Buscar votações criadas
-        await fetchSessionVotings();
-
-        // Buscar preview de agrupamento
-        await fetchGroupedVotings();
       }
     } catch (error) {
       console.error('Error fetching session votes:', error);
     }
   };
 
-  const fetchSessionVotings = async () => {
+  const fetchSessionResults = async () => {
     try {
       const response = await fetch(
         `/api/ccr/sessions/${params.id}/processos/${params.resourceId}/votings`
@@ -239,7 +246,7 @@ export default function JulgarProcessoPage() {
 
       if (response.ok) {
         const votings = await response.json();
-        setSessionVotings(votings);
+        setSessionResults(votings);
       }
     } catch (error) {
       console.error('Error fetching session votings:', error);
@@ -275,7 +282,13 @@ export default function JulgarProcessoPage() {
       if (response.ok) {
         const result = await response.json();
         toast.success(result.message || 'Votações criadas com sucesso');
-        await fetchSessionVotes();
+
+        // Atualizar dados em paralelo
+        await Promise.all([
+          fetchSessionVotes(),
+          fetchSessionResults(),
+          fetchGroupedVotings()
+        ]);
       } else {
         const error = await response.json();
         toast.error(error.error || 'Erro ao criar votações');
@@ -428,9 +441,9 @@ export default function JulgarProcessoPage() {
           {/* Card de Status e Ações */}
           <Card>
             <CardHeader>
-              <CardTitle>Status e Ações do Processo</CardTitle>
+              <CardTitle>Texto da Ata</CardTitle>
               <CardDescription>
-                Atualize o status do processo ou registre informações adicionais.
+                Texto obrigatório que aparecerá na ata para este processo.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -473,6 +486,7 @@ export default function JulgarProcessoPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              {/* Primeira linha: Número do Processo e Status */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-0">
                   <label className="block text-sm font-medium mb-1.5">Número do Processo</label>
@@ -489,13 +503,17 @@ export default function JulgarProcessoPage() {
                   <Badge
                     variant="secondary"
                     className={cn(
-                      getResourceStatusColor(data.sessionResource.resource.status),
-                      'hover:bg-opacity-100'
+                      getResourceStatusColor(data.sessionResource.resource.status).replace(/border-\S+/, ''),
+                      'w-fit'
                     )}
                   >
                     {getResourceStatusLabel(data.sessionResource.resource.status)}
                   </Badge>
                 </div>
+              </div>
+
+              {/* Segunda linha: Número do Recurso e Razão Social */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-0">
                   <label className="block text-sm font-medium mb-1.5">Número do Recurso</label>
                   <p className="text-sm">{data.sessionResource.resource.resourceNumber}</p>
@@ -603,9 +621,11 @@ export default function JulgarProcessoPage() {
                             Revisor {data.reviewers.length > 1 ? `${idx + 1}` : ''} • {revisor.role}
                           </p>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(data.distribution.session.date), 'dd/MM/yyyy', { locale: ptBR })}
-                        </p>
+                        {revisor.distributionDate && (
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(revisor.distributionDate), 'dd/MM/yyyy', { locale: ptBR })}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -635,9 +655,9 @@ export default function JulgarProcessoPage() {
           </CardHeader>
           <CardContent>
             {/* Votações */}
-            {sessionVotings.length > 0 && (
+            {sessionResults.length > 0 && (
               <div className="space-y-4">
-                {sessionVotings.map((voting, index) => (
+                {sessionResults.map((voting, index) => (
                   <VotingCard
                     key={voting.id}
                     voting={voting}
@@ -645,13 +665,14 @@ export default function JulgarProcessoPage() {
                     resourceId={params.resourceId as string}
                     index={index + 1}
                     totalMembers={data.session.members.length}
+                    onDelete={fetchSessionResults}
                   />
                 ))}
               </div>
             )}
 
             {/* Mensagem quando não há votações */}
-            {sessionVotings.length === 0 && (
+            {sessionResults.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 <AlertCircle className="h-12 w-12 mx-auto mb-3 text-gray-400" />
                 <p className="text-sm">Nenhuma votação criada ainda.</p>
@@ -674,80 +695,80 @@ export default function JulgarProcessoPage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {/* Suspenso */}
-              <Card
+              <div
                 onClick={() => setSelectedResult('SUSPENSO')}
                 className={cn(
-                  "cursor-pointer transition-all",
+                  "bg-white rounded-lg border cursor-pointer transition-all flex flex-col",
                   selectedResult === 'SUSPENSO'
                     ? "border-2 border-gray-900"
                     : "hover:border-gray-900"
                 )}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-4">
-                  <CardTitle className="text-sm font-medium">Suspenso</CardTitle>
+                <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-0">
+                  <div className="text-sm font-medium leading-none">Suspenso</div>
                   <Ban className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent className="space-y-0.5 pb-4">
+                </div>
+                <div className="space-y-0.5 px-6 pt-6 pb-6">
                   <p className="text-xs text-muted-foreground">Processo suspenso temporariamente</p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Pedido de Diligência */}
-              <Card
+              <div
                 onClick={() => setSelectedResult('DILIGENCIA')}
                 className={cn(
-                  "cursor-pointer transition-all",
+                  "bg-white rounded-lg border cursor-pointer transition-all flex flex-col",
                   selectedResult === 'DILIGENCIA'
                     ? "border-2 border-gray-900"
                     : "hover:border-gray-900"
                 )}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-4">
-                  <CardTitle className="text-sm font-medium">Pedido de Diligência</CardTitle>
+                <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-0">
+                  <div className="text-sm font-medium leading-none">Pedido de Diligência</div>
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent className="space-y-0.5 pb-4">
+                </div>
+                <div className="space-y-0.5 px-6 pt-6 pb-6">
                   <p className="text-xs text-muted-foreground">Solicitar informações adicionais</p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Pedido de Vista */}
-              <Card
+              <div
                 onClick={() => setSelectedResult('PEDIDO_VISTA')}
                 className={cn(
-                  "cursor-pointer transition-all",
+                  "bg-white rounded-lg border cursor-pointer transition-all flex flex-col",
                   selectedResult === 'PEDIDO_VISTA'
                     ? "border-2 border-gray-900"
                     : "hover:border-gray-900"
                 )}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-4">
-                  <CardTitle className="text-sm font-medium">Pedido de Vista</CardTitle>
+                <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-0">
+                  <div className="text-sm font-medium leading-none">Pedido de Vista</div>
                   <FileSearch className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent className="space-y-0.5 pb-4">
+                </div>
+                <div className="space-y-0.5 px-6 pt-6 pb-6">
                   <p className="text-xs text-muted-foreground">Processo em análise detalhada</p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
               {/* Julgado */}
-              <Card
+              <div
                 onClick={() => setSelectedResult('JULGADO')}
                 className={cn(
-                  "cursor-pointer transition-all",
+                  "bg-white rounded-lg border cursor-pointer transition-all flex flex-col",
                   selectedResult === 'JULGADO'
                     ? "border-2 border-gray-900"
                     : "hover:border-gray-900"
                 )}
               >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-4">
-                  <CardTitle className="text-sm font-medium">Julgado</CardTitle>
+                <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-0">
+                  <div className="text-sm font-medium leading-none">Julgado</div>
                   <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent className="space-y-0.5 pb-4">
+                </div>
+                <div className="space-y-0.5 px-6 pt-6 pb-6">
                   <p className="text-xs text-muted-foreground">Processo com decisão final</p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -755,20 +776,19 @@ export default function JulgarProcessoPage() {
         {/* Card de Status e Ações */}
         <Card>
           <CardHeader>
-            <CardTitle>Status e Ações do Processo</CardTitle>
+            <CardTitle>Texto da Ata</CardTitle>
             <CardDescription>
-              Atualize o status do processo ou registre informações adicionais.
+              Texto obrigatório que aparecerá na ata para este processo.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Texto da Ata</label>
               <Textarea
                 value={minutesText}
                 onChange={(e) => setMinutesText(e.target.value)}
                 placeholder="Digite o texto da ata para este processo..."
                 rows={4}
-                className="resize-none"
+                className="resize-none px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
               />
             </div>
 
@@ -778,7 +798,7 @@ export default function JulgarProcessoPage() {
                 <select
                   value={viewRequestedMemberId}
                   onChange={(e) => setViewRequestedMemberId(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-gray-400"
+                  className="w-full h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors"
                 >
                   <option value="">Selecione...</option>
                   {data.session.members.map((m) => (
@@ -798,6 +818,7 @@ export default function JulgarProcessoPage() {
                   value={diligenceDays}
                   onChange={(e) => setDiligenceDays(e.target.value)}
                   placeholder="Ex: 30"
+                  className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                 />
               </div>
             )}

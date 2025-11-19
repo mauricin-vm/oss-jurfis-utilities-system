@@ -5,7 +5,10 @@ import prismadb from '@/lib/prismadb';
 
 /**
  * POST /api/ccr/sessions/[id]/processos/[resourceId]/votes
- * Adiciona um voto a uma votação existente
+ * Adiciona um voto a um resultado de votação existente
+ *
+ * Nota: Este endpoint está usando a estrutura antiga e precisa ser atualizado
+ * para usar SessionVote ao invés de SessionMemberVote (que não existe mais)
  */
 export async function POST(
   req: NextRequest,
@@ -24,43 +27,43 @@ export async function POST(
     const { id: sessionId, resourceId } = await params;
     const body = await req.json();
     const {
-      votingResultId,
+      resultId,
       memberId,
-      sessionId: votedInSessionId,
       voteType,
       participationStatus,
-      votePosition,
-      voteDecisionId,
-      justification,
+      voteKnowledgeType,
+      preliminaryDecisionId,
+      meritDecisionId,
+      officialDecisionId,
+      voteText,
+      followsVoteId,
     } = body;
 
     // Validações
-    if (!votingResultId || !memberId || !votedInSessionId) {
+    if (!resultId || !memberId || !voteKnowledgeType) {
       return NextResponse.json(
         { error: 'Campos obrigatórios faltando' },
         { status: 400 }
       );
     }
 
-    // Verificar se votação existe
-    const votingResult = await prismadb.sessionVotingResult.findUnique({
-      where: { id: votingResultId },
+    // Verificar se resultado existe
+    const result = await prismadb.sessionResult.findUnique({
+      where: { id: resultId },
     });
 
-    if (!votingResult) {
+    if (!result) {
       return NextResponse.json(
-        { error: 'Votação não encontrada' },
+        { error: 'Resultado não encontrado' },
         { status: 404 }
       );
     }
 
     // Verificar se membro já votou nesta votação
-    const existingVote = await prismadb.sessionMemberVote.findUnique({
+    const existingVote = await prismadb.sessionVote.findFirst({
       where: {
-        sessionVotingResultId_memberId: {
-          sessionVotingResultId: votingResultId,
-          memberId,
-        },
+        sessionResultId: resultId,
+        memberId,
       },
     });
 
@@ -72,17 +75,20 @@ export async function POST(
     }
 
     // Criar voto
-    const vote = await prismadb.sessionMemberVote.create({
+    const vote = await prismadb.sessionVote.create({
       data: {
-        sessionVotingResultId: votingResultId,
+        sessionResourceId: resourceId,
+        sessionResultId: resultId,
         memberId,
-        votedInSessionId,
-        voteType: voteType || 'VOTANTE',
+        sessionId,
+        voteType: voteType || 'REVISOR',
         participationStatus: participationStatus || 'PRESENTE',
-        votePosition: votePosition || 'VOTO_PROPRIO',
-        voteDecisionId: voteDecisionId || null,
-        isQualityVote: false,
-        justification: justification || null,
+        voteKnowledgeType,
+        preliminaryDecisionId: preliminaryDecisionId || null,
+        meritDecisionId: meritDecisionId || null,
+        officialDecisionId: officialDecisionId || null,
+        voteText: voteText || null,
+        followsVoteId: followsVoteId || null,
       },
       include: {
         member: {
@@ -90,23 +96,48 @@ export async function POST(
             id: true,
             name: true,
             role: true,
+            gender: true,
           },
         },
-        voteDecision: true,
-        votedInSession: {
+        followsVote: {
+          include: {
+            member: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+                gender: true,
+              },
+            },
+          },
+        },
+        preliminaryDecision: {
           select: {
             id: true,
-            sessionNumber: true,
-            date: true,
+            identifier: true,
+            type: true,
+          },
+        },
+        meritDecision: {
+          select: {
+            id: true,
+            identifier: true,
+            type: true,
+          },
+        },
+        officialDecision: {
+          select: {
+            id: true,
+            identifier: true,
+            type: true,
           },
         },
       },
     });
 
-    // Atualizar contadores da votação
-    // (Simplificado: apenas incrementa totalVotes)
-    await prismadb.sessionVotingResult.update({
-      where: { id: votingResultId },
+    // Atualizar contadores do resultado
+    await prismadb.sessionResult.update({
+      where: { id: resultId },
       data: {
         totalVotes: {
           increment: 1,
