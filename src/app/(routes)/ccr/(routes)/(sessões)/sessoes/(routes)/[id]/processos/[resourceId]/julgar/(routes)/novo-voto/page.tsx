@@ -19,6 +19,7 @@ interface JudgmentData {
   session: {
     id: string;
     sessionNumber: string;
+    status: string;
     members: Array<{
       member: {
         id: string;
@@ -78,6 +79,13 @@ export default function NovoVotoPage() {
       fetchData();
     }
   }, [params.id, params.resourceId]);
+
+  // Bloquear acesso se a sessão estiver concluída
+  useEffect(() => {
+    if (data?.session.status === 'CONCLUIDA') {
+      router.push(`/ccr/sessoes/${params.id}/processos/${params.resourceId}/julgar`);
+    }
+  }, [data, params.id, params.resourceId, router]);
 
   const fetchData = async () => {
     try {

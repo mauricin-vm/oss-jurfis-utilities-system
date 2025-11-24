@@ -47,16 +47,17 @@ export async function POST(
       );
     }
 
-    // Verificar se todos os processos foram julgados
-    const processosPendentes = sessionData.resources.filter(
-      r => r.status !== 'JULGADO'
+    // Verificar se todos os processos têm resultado (ou não há processos)
+    const totalProcessos = sessionData.resources.length;
+    const processosSemResultado = sessionData.resources.filter(
+      r => !['JULGADO', 'SUSPENSO', 'DILIGENCIA', 'PEDIDO_VISTA'].includes(r.status)
     );
 
-    if (processosPendentes.length > 0) {
+    if (totalProcessos > 0 && processosSemResultado.length > 0) {
       return NextResponse.json(
         {
-          error: 'Todos os processos da pauta devem ser julgados antes de concluir a sessão',
-          processosPendentes: processosPendentes.length
+          error: 'Todos os processos da pauta devem ter um resultado antes de concluir a sessão',
+          processosSemResultado: processosSemResultado.length
         },
         { status: 400 }
       );

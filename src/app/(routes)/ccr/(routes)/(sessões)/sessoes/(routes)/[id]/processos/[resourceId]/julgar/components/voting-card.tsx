@@ -3,12 +3,15 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, CheckCircle2, Clock, Eye, X, Calendar, Loader2 } from 'lucide-react';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
+import { Users, CheckCircle2, Clock, Eye, X, Calendar, Loader2, GripVertical } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface VotingCardProps {
   voting: {
@@ -27,6 +30,11 @@ interface VotingCardProps {
       sessionNumber: string;
       date: Date;
     } | null;
+    winningMember?: {
+      id: string;
+      name: string;
+      role: string;
+    } | null;
     votes: Array<{
       id: string;
       member: {
@@ -37,6 +45,9 @@ interface VotingCardProps {
       voteType: string;
       voteKnowledgeType: string;
       participationStatus: string;
+      followsVote?: {
+        id: string;
+      } | null;
       session?: {
         id: string;
         sessionNumber: string;
@@ -64,17 +75,36 @@ interface VotingCardProps {
   resourceId: string;
   index: number;
   totalMembers: number;
+  totalDistributedMembers: number;
+  totalAbsentMembers: number;
+  isSessionCompleted?: boolean;
   onDelete?: () => void;
+  onVotingChange?: () => Promise<void>;
 }
 
-export function VotingCard({ voting, sessionId, resourceId, index, totalMembers, onDelete }: VotingCardProps) {
+export function VotingCard({ voting, sessionId, resourceId, index, totalMembers, totalDistributedMembers, totalAbsentMembers, isSessionCompleted = false, onDelete, onVotingChange }: VotingCardProps) {
   const router = useRouter();
   const [actionLoading, setActionLoading] = useState(false);
+  const [hoveredVoteId, setHoveredVoteId] = useState<string | null>(null);
+  const [deletingVoteId, setDeletingVoteId] = useState<string | null>(null);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: voting.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
 
   const handleDelete = async () => {
     if (!onDelete) return;
-
-    setActionLoading(true);
 
     toast.warning('Tem certeza que deseja excluir esta votação?', {
       duration: 10000,
@@ -82,6 +112,7 @@ export function VotingCard({ voting, sessionId, resourceId, index, totalMembers,
         label: 'Confirmar',
         onClick: async () => {
           try {
+            setActionLoading(true);
             const response = await fetch(
               `/api/ccr/sessions/${sessionId}/processos/${resourceId}/votings/${voting.id}`,
               {
@@ -92,6 +123,7 @@ export function VotingCard({ voting, sessionId, resourceId, index, totalMembers,
             if (response.ok) {
               toast.success('Votação excluída com sucesso');
               onDelete();
+              if (onVotingChange) await onVotingChange(); // Resetar resultado se existir
             } else {
               const error = await response.json();
               toast.error(error.error || 'Erro ao excluir votação');
@@ -106,9 +138,90 @@ export function VotingCard({ voting, sessionId, resourceId, index, totalMembers,
       },
       cancel: {
         label: 'Cancelar',
-        onClick: () => {
-          setActionLoading(false);
+        onClick: () => {},
+      },
+    });
+  };
+
+  const handleDeclareUnanimous = async () => {
+    toast.warning('Declarar esta votação como unânime? Todos os membros seguirão este voto.', {
+      duration: 10000,
+      className: 'min-w-[400px]',
+      action: {
+        label: 'Confirmar',
+        onClick: async () => {
+          try {
+            setActionLoading(true);
+            const response = await fetch(
+              `/api/ccr/sessions/${sessionId}/processos/${resourceId}/votings/${voting.id}/unanimous`,
+              {
+                method: 'POST',
+              }
+            );
+
+            if (response.ok) {
+              toast.success('Votação declarada como unânime com sucesso');
+              if (onDelete) onDelete(); // Recarregar os dados
+              if (onVotingChange) await onVotingChange(); // Resetar resultado se existir
+            } else {
+              const error = await response.json();
+              toast.error(error.error || 'Erro ao declarar votação como unânime');
+            }
+          } catch (error) {
+            console.error('Error declaring unanimous:', error);
+            toast.error('Erro ao declarar votação como unânime');
+          } finally {
+            setActionLoading(false);
+          }
         },
+      },
+      cancel: {
+        label: 'Cancelar',
+        onClick: () => {},
+      },
+    });
+  };
+
+  const handleDeleteVote = async (voteId: string, voteType: string, memberName: string) => {
+    const isRevisor = voteType === 'REVISOR';
+    const warningMessage = isRevisor
+      ? `Tem certeza que deseja excluir o voto do revisor ${memberName}? O revisor pode ser removido da lista de revisores se foi adicionado apenas nesta sessão.`
+      : `Tem certeza que deseja excluir o voto do relator ${memberName}?`;
+
+    toast.warning(warningMessage, {
+      duration: 10000,
+      className: 'min-w-[450px]',
+      action: {
+        label: 'Confirmar',
+        onClick: async () => {
+          try {
+            setDeletingVoteId(voteId);
+            const response = await fetch(
+              `/api/ccr/sessions/${sessionId}/processos/${resourceId}/votes/${voteId}`,
+              {
+                method: 'DELETE',
+              }
+            );
+
+            if (response.ok) {
+              toast.success('Voto excluído com sucesso');
+              if (onDelete) onDelete(); // Recarregar os dados
+              if (onVotingChange) await onVotingChange(); // Resetar resultado se existir
+            } else {
+              const error = await response.json();
+              toast.error(error.error || 'Erro ao excluir voto');
+            }
+          } catch (error) {
+            console.error('Error deleting vote:', error);
+            toast.error('Erro ao excluir voto');
+          } finally {
+            setDeletingVoteId(null);
+          }
+        },
+      },
+      cancel: {
+        label: 'Cancelar',
+        onClick: () => {},
       },
     });
   };
@@ -144,27 +257,46 @@ export function VotingCard({ voting, sessionId, resourceId, index, totalMembers,
   const votosComMaiorContagem = contagemVotos.filter(count => count === maiorContagem);
   const hasEmpate = votosComMaiorContagem.length > 1 && maiorContagem > 0;
 
-  // Calcular pendentes
-  let votosPendentes = totalMembers - voting.votes.length;
+  // Calcular votos pendentes
+  // Total de membros menos membros distribuídos e ausentes na sessão
+  const membrosDisponiveis = totalMembers - totalDistributedMembers - totalAbsentMembers;
 
-  // Ajustar pendentes baseado no empate
-  if (hasEmpate) {
-    // Se há empate e presidente ainda não votou, ele deve ser contado nos pendentes
-    // (já está incluído no cálculo base se for membro da sessão)
-  } else {
-    // Se NÃO há empate e presidente ainda não votou, ele NÃO deve ser contado nos pendentes
-    if (!presidenteVote && votosPendentes > 0) {
-      votosPendentes -= 1;
-    }
-  }
+  // Contar votos PRESENTES de conselheiros
+  const votosConselheirosPresentes = voting.votes.filter(
+    v => v.voteType !== 'RELATOR' &&
+         v.voteType !== 'REVISOR' &&
+         v.participationStatus === 'PRESENTE'
+  ).length;
+
+  // Contar impedidos, suspeitos e abstenções (não são pendentes, já se manifestaram)
+  const votosNaoPresentes = voting.votes.filter(
+    v => v.voteType !== 'RELATOR' &&
+         v.voteType !== 'REVISOR' &&
+         (v.participationStatus === 'IMPEDIDO' ||
+          v.participationStatus === 'SUSPEITO' ||
+          v.participationStatus === 'ABSTENCAO')
+  ).length;
+
+  // Pendentes = membros disponíveis - votos presentes - impedidos/suspeitos/abstenções
+  let votosPendentes = membrosDisponiveis - votosConselheirosPresentes - votosNaoPresentes;
+
+  // Garantir que não seja negativo
+  votosPendentes = Math.max(0, votosPendentes);
 
   return (
-    <div className="bg-white rounded-lg border p-6">
+    <div ref={setNodeRef} style={style} className="bg-white rounded-lg border p-6">
       {/* Header com número em círculo e tipo de votação */}
       <div className="flex items-start justify-between mb-1">
         <div className="flex items-center gap-3 flex-1">
-          {/* Número em círculo */}
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-medium text-sm">
+          {/* Drag handle */}
+          <div
+            {...(!isSessionCompleted ? attributes : {})}
+            {...(!isSessionCompleted ? listeners : {})}
+            className={cn(
+              "flex-shrink-0 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center font-medium text-sm",
+              !isSessionCompleted && "cursor-grab active:cursor-grabbing"
+            )}
+          >
             {index}
           </div>
           {/* Tipo de votação */}
@@ -204,19 +336,37 @@ export function VotingCard({ voting, sessionId, resourceId, index, totalMembers,
             <Eye className="h-4 w-4 mr-2" />
             Detalhes
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDelete}
-            disabled={actionLoading || voting.status === 'CONCLUIDA'}
-            className="cursor-pointer h-9 w-9 p-0"
-          >
-            {actionLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <X className="h-4 w-4" />
-            )}
-          </Button>
+          {!isSessionCompleted && voting.votes.length === 1 && voting.status === 'PENDENTE' && (
+            <TooltipWrapper content="Declarar votação como unânime">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDeclareUnanimous}
+                disabled={actionLoading}
+                className="cursor-pointer h-9"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Unânime
+              </Button>
+            </TooltipWrapper>
+          )}
+          {!isSessionCompleted && (
+            <TooltipWrapper content="Excluir votação">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDelete}
+                disabled={actionLoading}
+                className="cursor-pointer h-9 w-9 p-0"
+              >
+                {actionLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <X className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipWrapper>
+          )}
         </div>
       </div>
 
@@ -260,11 +410,26 @@ export function VotingCard({ voting, sessionId, resourceId, index, totalMembers,
                   vote.voteType === 'REVISOR' ? 'Revisor' :
                   'Votante';
 
+                // Verificar se este membro é o vencedor
+                const isWinner = voting.status === 'CONCLUIDA' &&
+                                voting.winningMember &&
+                                voting.winningMember.id === vote.member.id;
+
                 return (
-                  <div key={vote.id} className="text-sm flex items-center gap-2 flex-wrap">
+                  <div
+                    key={vote.id}
+                    className="text-sm flex items-center gap-2 flex-wrap group"
+                    onMouseEnter={() => setHoveredVoteId(vote.id)}
+                    onMouseLeave={() => setHoveredVoteId(null)}
+                  >
                     <div className="flex items-center gap-1.5">
                       <span className="font-medium">{voteTypeLabel}: </span>
                       <span className="text-muted-foreground">{vote.member.name} ({voteInfo})</span>
+                      {isWinner && (
+                        <Badge className="bg-green-600 hover:bg-green-600 text-white text-[10px] px-1.5 py-0 ml-1">
+                          Vencedor
+                        </Badge>
+                      )}
                     </div>
                     {vote.session && (
                       <Badge
@@ -274,6 +439,27 @@ export function VotingCard({ voting, sessionId, resourceId, index, totalMembers,
                         <Calendar className="h-3.5 w-3.5" />
                         Sessão n. {vote.session.sessionNumber} - {format(new Date(vote.session.date), 'dd/MM/yyyy', { locale: ptBR })}
                       </Badge>
+                    )}
+                    {voting.status !== 'CONCLUIDA' && (
+                      <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                        {hoveredVoteId === vote.id && (
+                          <TooltipWrapper content="Excluir voto">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteVote(vote.id, vote.voteType, vote.member.name)}
+                              disabled={deletingVoteId === vote.id}
+                              className="cursor-pointer h-4 w-4 p-0 hover:bg-red-100 hover:text-red-600 transition-colors"
+                            >
+                              {deletingVoteId === vote.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <X className="h-3 w-3" />
+                              )}
+                            </Button>
+                          </TooltipWrapper>
+                        )}
+                      </div>
                     )}
                   </div>
                 );

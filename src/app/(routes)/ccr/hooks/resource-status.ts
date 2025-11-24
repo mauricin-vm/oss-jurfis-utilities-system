@@ -14,39 +14,43 @@ export const RESOURCE_STATUS = {
   },
   CONTRARRAZAO: {
     label: 'Contrarrazão',
-    color: 'bg-amber-100 text-amber-800 border-amber-300',
+    color: 'bg-orange-100 text-orange-800 border-orange-300',
   },
   PARECER_PGM: {
     label: 'Parecer PGM',
-    color: 'bg-orange-100 text-orange-800 border-orange-300',
+    color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
   },
   DISTRIBUICAO: {
     label: 'Distribuição',
-    color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    color: 'bg-indigo-100 text-indigo-800 border-indigo-300',
   },
   NOTIFICACAO_JULGAMENTO: {
     label: 'Notificação Julgamento',
-    color: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+    color: 'bg-purple-100 text-purple-800 border-purple-300',
   },
   JULGAMENTO: {
     label: 'Julgamento',
-    color: 'bg-purple-100 text-purple-800 border-purple-300',
+    color: 'bg-violet-100 text-violet-800 border-violet-300',
   },
   DILIGENCIA: {
     label: 'Diligência',
-    color: 'bg-slate-100 text-slate-800 border-slate-300',
+    color: 'bg-cyan-100 text-cyan-700 border-cyan-300',
   },
   PEDIDO_VISTA: {
     label: 'Pedido de Vista',
-    color: 'bg-gray-100 text-gray-800 border-gray-300',
+    color: 'bg-rose-100 text-rose-700 border-rose-300',
   },
   SUSPENSO: {
     label: 'Suspenso',
-    color: 'bg-red-100 text-red-800 border-red-300',
+    color: 'bg-amber-100 text-amber-700 border-amber-300',
+  },
+  JULGADO: {
+    label: 'Julgado',
+    color: 'bg-emerald-100 text-emerald-700 border-emerald-300',
   },
   PUBLICACAO_ACORDAO: {
     label: 'Publicação Acórdão',
-    color: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    color: 'bg-emerald-100 text-emerald-700 border-emerald-300',
   },
   ASSINATURA_ACORDAO: {
     label: 'Assinatura Acórdão',
@@ -59,6 +63,10 @@ export const RESOURCE_STATUS = {
   CONCLUIDO: {
     label: 'Concluído',
     color: 'bg-green-100 text-green-800 border-green-300',
+  },
+  EM_PAUTA: {
+    label: 'Em Pauta',
+    color: 'bg-blue-100 text-blue-700 border-blue-300',
   },
 } as const;
 

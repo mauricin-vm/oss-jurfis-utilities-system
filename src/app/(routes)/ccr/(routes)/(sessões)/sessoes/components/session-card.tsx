@@ -6,7 +6,6 @@ import { Progress } from '@/components/ui/progress';
 import { Card } from '@/components/ui/card';
 import { Calendar, Clock, Users, FileText, CheckCircle2, Crown, PlayCircle, Newspaper, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -66,22 +65,6 @@ const statusIcons: Record<string, React.ReactNode> = {
   CANCELADA: <X className="h-3.5 w-3.5" />,
 };
 
-const resourceStatusLabels: Record<string, string> = {
-  EM_PAUTA: 'Em Pauta',
-  SUSPENSO: 'Suspenso',
-  DILIGENCIA: 'Diligência',
-  PEDIDO_VISTA: 'Pedido Vista',
-  JULGADO: 'Julgado',
-};
-
-const resourceStatusColors: Record<string, string> = {
-  EM_PAUTA: 'bg-blue-100 text-blue-700 hover:bg-blue-100',
-  SUSPENSO: 'bg-amber-100 text-amber-700 hover:bg-amber-100',
-  DILIGENCIA: 'bg-cyan-100 text-cyan-700 hover:bg-cyan-100',
-  PEDIDO_VISTA: 'bg-rose-100 text-rose-700 hover:bg-rose-100',
-  JULGADO: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100',
-};
-
 export function SessionCard({ session }: SessionCardProps) {
   const router = useRouter();
 
@@ -90,15 +73,10 @@ export function SessionCard({ session }: SessionCardProps) {
   const adjustedDate = new Date(sessionDate.getTime() + sessionDate.getTimezoneOffset() * 60000);
 
   const totalProcesses = session.resources?.length || 0;
-  const judgedProcesses = session.resources?.filter(
-    (r) => r.status === 'JULGADO'
+  const processedResources = session.resources?.filter(
+    (r) => ['JULGADO', 'SUSPENSO', 'DILIGENCIA', 'PEDIDO_VISTA'].includes(r.status)
   ).length || 0;
-  const progress = totalProcesses > 0 ? (judgedProcesses / totalProcesses) * 100 : 0;
-
-  // Pegar últimos resultados (últimos 2 processos)
-  const lastResults = session.resources
-    ?.filter((r) => r.status !== 'EM_PAUTA')
-    .slice(-2) || [];
+  const progress = totalProcesses > 0 ? (processedResources / totalProcesses) * 100 : 0;
 
   return (
     <Card className="px-6 pt-4 pb-4">
@@ -126,18 +104,9 @@ export function SessionCard({ session }: SessionCardProps) {
             className="cursor-pointer"
             onClick={() => router.push(`/ccr/sessoes/${session.id}`)}
           >
-            Ver Detalhes
+            <FileText className="h-4 w-4 mr-2" />
+            Detalhes
           </Button>
-          {session.status === 'CONCLUIDA' && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="cursor-pointer"
-              onClick={() => router.push(`/ccr/sessoes/${session.id}/pauta`)}
-            >
-              Ver Pauta
-            </Button>
-          )}
         </div>
       </div>
 
@@ -150,7 +119,7 @@ export function SessionCard({ session }: SessionCardProps) {
           </div>
           <Progress value={progress} className="h-2" />
           <p className="text-xs text-muted-foreground mt-1">
-            {judgedProcesses} de {totalProcesses} processos analisados
+            {processedResources} de {totalProcesses} processos analisados
           </p>
         </div>
       )}
@@ -193,36 +162,6 @@ export function SessionCard({ session }: SessionCardProps) {
           </div>
         </div>
       </div>
-
-      {/* Last Results */}
-      {lastResults.length > 0 && (
-        <div className="border-t pt-4">
-          <p className="text-sm font-medium text-gray-700 mb-2">Últimos Resultados:</p>
-          <div className="space-y-1.5">
-            {lastResults.map((result) => (
-              <div key={result.id} className="flex items-center justify-between text-sm">
-                <Link
-                  href={`/ccr/recursos/${result.resource.id}`}
-                  className="text-blue-600 hover:underline font-medium"
-                >
-                  {result.resource.processNumber}
-                </Link>
-                <Badge
-                  variant="secondary"
-                  className={`${resourceStatusColors[result.status]} text-xs`}
-                >
-                  {resourceStatusLabels[result.status]}
-                </Badge>
-              </div>
-            ))}
-            {(session.resources?.length || 0) > 2 && (
-              <p className="text-xs text-muted-foreground">
-                ... e mais {(session.resources?.length || 0) - 2} resultados
-              </p>
-            )}
-          </div>
-        </div>
-      )}
     </Card>
   );
 }

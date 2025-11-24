@@ -132,8 +132,6 @@ export function AuthoritiesForm({ initialData, registeredAuthorities }: Authorit
 
   const handleToggleActivePart = async (partId: string, partName: string, currentStatus: boolean) => {
     try {
-      setActionLoading(partId);
-
       const action = currentStatus ? 'desativar' : 'ativar';
       const actionPast = currentStatus ? 'desativada' : 'ativada';
 
@@ -142,6 +140,7 @@ export function AuthoritiesForm({ initialData, registeredAuthorities }: Authorit
         action: {
           label: 'Confirmar',
           onClick: async () => {
+            setActionLoading(partId);
             const response = await fetch(`/api/ccr/parts/${partId}`, {
               method: 'PATCH',
             });
@@ -161,9 +160,7 @@ export function AuthoritiesForm({ initialData, registeredAuthorities }: Authorit
         },
         cancel: {
           label: 'Cancelar',
-          onClick: () => {
-            setActionLoading(null);
-          },
+          onClick: () => {},
         },
       });
     } catch (error) {
@@ -175,13 +172,12 @@ export function AuthoritiesForm({ initialData, registeredAuthorities }: Authorit
 
   const handleDeletePart = async (partId: string, partName: string) => {
     try {
-      setActionLoading(partId);
-
       toast.warning(`Tem certeza que deseja excluir permanentemente a parte "${partName}"?`, {
         duration: 10000,
         action: {
           label: 'Confirmar',
           onClick: async () => {
+            setActionLoading(partId);
             const response = await fetch(`/api/ccr/parts/${partId}`, {
               method: 'DELETE',
             });
@@ -199,9 +195,7 @@ export function AuthoritiesForm({ initialData, registeredAuthorities }: Authorit
         },
         cancel: {
           label: 'Cancelar',
-          onClick: () => {
-            setActionLoading(null);
-          },
+          onClick: () => {},
         },
       });
     } catch (error) {

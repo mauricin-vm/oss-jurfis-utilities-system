@@ -23,8 +23,12 @@
 - verificações: padrão de cores e estrutura; espaçamento; input e select (borda, ring e accent); skeleton; tooltip
 
 
-- na página de presenças no julgamento, no navegador superior (página que estamos), colocar o n. da sessão na parte de Sessão
+
+
+- concluir resultado
+- pensar níveis de acesso na página de rseultado e votação
+- pensar em editar resultado (listar registros)
 
 
 
-- na página de detalhes da votação, corrigir mostrar/ocultar presidente que ainda ta errado
+

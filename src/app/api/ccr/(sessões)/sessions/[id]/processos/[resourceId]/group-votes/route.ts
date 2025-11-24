@@ -197,6 +197,21 @@ export async function POST(
       (v) => v.voteKnowledgeType === 'NAO_CONHECIMENTO' && v.preliminaryDecisionId
     );
 
+    // Buscar o maior valor de order existente para este recurso
+    const maxOrderResult = await prismadb.sessionResult.findFirst({
+      where: {
+        resourceId: sessionResource.resourceId,
+      },
+      orderBy: {
+        order: 'desc',
+      },
+      select: {
+        order: true,
+      },
+    });
+
+    let currentOrder = maxOrderResult?.order ?? 0;
+
     const preliminaryGroups = new Map<string, typeof votes>();
     preliminaryVotes.forEach((vote) => {
       const key = vote.preliminaryDecisionId!;
@@ -207,12 +222,14 @@ export async function POST(
     });
 
     for (const [preliminaryDecisionId, groupVotes] of preliminaryGroups) {
+      currentOrder++;
       const result = await prismadb.sessionResult.create({
         data: {
           resourceId: sessionResource.resourceId,
           votingType: 'NAO_CONHECIMENTO',
           preliminaryDecisionId,
           status: 'PENDENTE',
+          order: currentOrder,
         },
       });
 
@@ -235,11 +252,13 @@ export async function POST(
     );
 
     if (naoConhecimentoSemPreliminar.length > 0) {
+      currentOrder++;
       const result = await prismadb.sessionResult.create({
         data: {
           resourceId: sessionResource.resourceId,
           votingType: 'NAO_CONHECIMENTO',
           status: 'PENDENTE',
+          order: currentOrder,
         },
       });
 
@@ -259,11 +278,13 @@ export async function POST(
     const meritoVotes = votes.filter((v) => v.voteKnowledgeType === 'CONHECIMENTO');
 
     if (meritoVotes.length > 0) {
+      currentOrder++;
       const result = await prismadb.sessionResult.create({
         data: {
           resourceId: sessionResource.resourceId,
           votingType: 'MERITO',
           status: 'PENDENTE',
+          order: currentOrder,
         },
       });
 

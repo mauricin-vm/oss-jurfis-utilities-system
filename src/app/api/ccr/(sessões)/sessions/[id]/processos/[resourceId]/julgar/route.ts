@@ -75,6 +75,22 @@ export async function GET(
             createdAt: 'asc',
           },
         },
+        absences: {
+          select: {
+            id: true,
+            member: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+                gender: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
         viewRequestedBy: {
           select: {
             id: true,
@@ -99,6 +115,7 @@ export async function GET(
         id: true,
         sessionNumber: true,
         date: true,
+        status: true,
         members: {
           include: {
             member: {
@@ -106,6 +123,7 @@ export async function GET(
                 id: true,
                 name: true,
                 role: true,
+                gender: true,
               },
             },
           },
@@ -149,7 +167,7 @@ export async function GET(
     let reviewers: Array<{
       id: string;
       name: string;
-      role: string;
+      role: string | null;
       distributionDate: Date | null;
     }> = [];
     if (distribution?.reviewersIds && distribution.reviewersIds.length > 0) {
@@ -229,11 +247,118 @@ export async function GET(
       },
     });
 
+    // Buscar todos os membros que já receberam distribuição (distributedToId) neste recurso
+    const allDistributions = await prismadb.sessionDistribution.findMany({
+      where: {
+        resourceId: sessionResource.resource.id,
+        isActive: true,
+      },
+      select: {
+        firstDistributionId: true,
+        distributedToId: true,
+      },
+    });
+
+    const distributedMemberIds = new Set<string>();
+
+    // Adicionar firstDistributionId (relator)
+    allDistributions.forEach(dist => {
+      if (dist.firstDistributionId) {
+        distributedMemberIds.add(dist.firstDistributionId);
+      }
+      // Adicionar distributedToId (quem recebeu distribuição nesta sessão)
+      distributedMemberIds.add(dist.distributedToId);
+    });
+
+    // Buscar todas as votações deste recurso para debug
+    const allVotings = await prismadb.sessionResult.findMany({
+      where: {
+        resourceId: sessionResource.resource.id,
+      },
+      select: {
+        id: true,
+        status: true,
+        votingType: true,
+      },
+    });
+
+    // Buscar votações concluídas (de todas as sessões)
+    const completedVotings = await prismadb.sessionResult.findMany({
+      where: {
+        resourceId: sessionResource.resource.id,
+        status: 'CONCLUIDA',
+      },
+      select: {
+        id: true,
+        votingType: true,
+        status: true,
+        order: true,
+        judgedInSession: {
+          select: {
+            id: true,
+            sessionNumber: true,
+            date: true,
+          },
+        },
+        votes: {
+          select: {
+            id: true,
+            voteType: true,
+            voteKnowledgeType: true,
+            voteText: true,
+            participationStatus: true,
+            followsVoteId: true,
+            member: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+                gender: true,
+              },
+            },
+            preliminaryDecision: {
+              select: {
+                id: true,
+                identifier: true,
+              },
+            },
+            meritDecision: {
+              select: {
+                id: true,
+                identifier: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+        winningMember: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: [
+        {
+          judgedInSession: {
+            date: 'asc',
+          },
+        },
+        {
+          order: 'asc',
+        },
+      ],
+    });
+
     return NextResponse.json({
       sessionResource,
       session: sessionData,
       distribution,
       reviewers,
+      distributedMemberIds: Array.from(distributedMemberIds),
+      completedVotings,
       preliminaryDecisions,
       meritDecisions,
       officialDecisions,

@@ -40,11 +40,19 @@ export async function GET(
       where: { id: votingId },
       include: {
         resource: {
-          select: {
-            id: true,
-            processNumber: true,
-            processName: true,
-            resourceNumber: true,
+          include: {
+            authorities: {
+              select: {
+                id: true,
+                type: true,
+                authorityRegistered: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
         judgedInSession: {
@@ -148,7 +156,46 @@ export async function GET(
       return NextResponse.json({ error: 'Votação não encontrada' }, { status: 404 });
     }
 
-    // Adicionar label
+    // Buscar membros da sessão para verificar impedimentos
+    const sessionData = await prismadb.session.findUnique({
+      where: { id: sessionId },
+      select: {
+        members: {
+          include: {
+            member: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Identificar membros impedidos (que são autoridades no processo)
+    const impedidMemberIds: Array<{ memberId: string; authorityType: string; authorityName: string }> = [];
+
+    if (result.resource.authorities && sessionData) {
+      result.resource.authorities.forEach((authority: any) => {
+        const authorityName = authority.authorityRegistered.name.toLowerCase();
+
+        // Procurar membro com nome igual
+        sessionData.members.forEach((sessionMember: any) => {
+          const memberName = sessionMember.member.name.toLowerCase();
+
+          if (memberName === authorityName) {
+            impedidMemberIds.push({
+              memberId: sessionMember.member.id,
+              authorityType: authority.type,
+              authorityName: authority.authorityRegistered.name,
+            });
+          }
+        });
+      });
+    }
+
+    // Adicionar label e impedimentos
     const resultWithLabel = {
       ...result,
       label: result.preliminaryDecision
@@ -156,6 +203,7 @@ export async function GET(
         : result.votingType === 'NAO_CONHECIMENTO'
         ? 'Não Conhecimento'
         : 'Mérito',
+      impedidMembers: impedidMemberIds,
     };
 
     return NextResponse.json(resultWithLabel);
@@ -211,14 +259,6 @@ export async function DELETE(
 
     if (!result) {
       return NextResponse.json({ error: 'Votação não encontrada' }, { status: 404 });
-    }
-
-    // Verificar se a votação está concluída
-    if (result.status === 'CONCLUIDA') {
-      return NextResponse.json(
-        { error: 'Não é possível excluir uma votação já concluída' },
-        { status: 400 }
-      );
     }
 
     // Para cada voto de revisor, verificar se deve ser removido da lista de revisores

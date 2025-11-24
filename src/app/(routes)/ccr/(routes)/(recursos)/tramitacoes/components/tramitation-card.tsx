@@ -70,13 +70,12 @@ export function TramitationCard({ tramitation, onMarkAsReceived, onDelete, userR
 
   const handleMarkAsReceived = async () => {
     if (onMarkAsReceived) {
-      setActionLoading('mark-received');
-
       toast.warning('Tem certeza que deseja marcar esta tramitação como entregue?', {
         duration: 10000,
         action: {
           label: 'Confirmar',
           onClick: async () => {
+            setActionLoading('mark-received');
             setLoading(true);
             try {
               await onMarkAsReceived(tramitation.id);
@@ -88,9 +87,7 @@ export function TramitationCard({ tramitation, onMarkAsReceived, onDelete, userR
         },
         cancel: {
           label: 'Cancelar',
-          onClick: () => {
-            setActionLoading(null);
-          },
+          onClick: () => {},
         },
       });
     }
@@ -98,22 +95,19 @@ export function TramitationCard({ tramitation, onMarkAsReceived, onDelete, userR
 
   const handleDelete = () => {
     if (onDelete) {
-      setActionLoading('delete');
-
       toast.warning('Tem certeza que deseja excluir esta tramitação?', {
         duration: 10000,
         action: {
           label: 'Confirmar',
           onClick: async () => {
+            setActionLoading('delete');
             await onDelete(tramitation.id, tramitation.processNumber);
             setActionLoading(null);
           },
         },
         cancel: {
           label: 'Cancelar',
-          onClick: () => {
-            setActionLoading(null);
-          },
+          onClick: () => {},
         },
       });
     }

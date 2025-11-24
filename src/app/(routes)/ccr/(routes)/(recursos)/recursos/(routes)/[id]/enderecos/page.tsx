@@ -156,8 +156,6 @@ export default function EnderecosPage() {
 
   const handleToggleActive = async (addressId: string, addressLabel: string, currentStatus: boolean) => {
     try {
-      setActionLoading(addressId);
-
       const action = currentStatus ? 'desativar' : 'ativar';
       const actionPast = currentStatus ? 'desativado' : 'ativado';
 
@@ -166,6 +164,7 @@ export default function EnderecosPage() {
         action: {
           label: 'Confirmar',
           onClick: async () => {
+            setActionLoading(addressId);
             const response = await fetch(`/api/ccr/addresses/${addressId}`, {
               method: 'PATCH',
             });
@@ -182,9 +181,7 @@ export default function EnderecosPage() {
         },
         cancel: {
           label: 'Cancelar',
-          onClick: () => {
-            setActionLoading(null);
-          },
+          onClick: () => {},
         },
       });
     } catch (error) {
@@ -196,13 +193,12 @@ export default function EnderecosPage() {
 
   const handleDelete = async (addressId: string, addressLabel: string) => {
     try {
-      setActionLoading(addressId);
-
       toast.warning(`Tem certeza que deseja excluir permanentemente o endereço?`, {
         duration: 10000,
         action: {
           label: 'Confirmar',
           onClick: async () => {
+            setActionLoading(addressId);
             const response = await fetch(`/api/ccr/addresses/${addressId}`, {
               method: 'DELETE',
             });
@@ -219,9 +215,7 @@ export default function EnderecosPage() {
         },
         cancel: {
           label: 'Cancelar',
-          onClick: () => {
-            setActionLoading(null);
-          },
+          onClick: () => {},
         },
       });
     } catch (error) {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { CCRPageWrapper } from '../../../../../components/ccr-page-wrapper';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ import {
   ClipboardList,
   GripVertical,
   UserCheck,
+  RotateCcw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -29,6 +31,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 import { toast } from 'sonner';
+import { getResourceStatusLabel, getResourceStatusColor, type ResourceStatusKey } from '../../../../../hooks/resource-status';
 import {
   DndContext,
   closestCenter,
@@ -90,8 +93,6 @@ interface VotingResult {
   id: string;
   votingType: string;
   totalVotes: number;
-  votesInFavor: number;
-  votesAgainst: number;
   abstentions: number;
   absences: number;
   impediments: number;
@@ -116,12 +117,14 @@ interface SessionResource {
   status: string;
   order: number;
   observations: string | null;
+  minutesText: string | null;
   createdAt: Date;
   addedAfterLastPublication: boolean;
   resource: {
     id: string;
     processNumber: string;
     processName: string | null;
+    resourceNumber: string;
     protocol: {
       presenter: string;
     };
@@ -231,28 +234,12 @@ const statusIcons: Record<string, React.ReactNode> = {
   CANCELADA: <X className="h-3.5 w-3.5" />,
 };
 
-const resourceStatusLabels: Record<string, string> = {
-  EM_PAUTA: 'Em Pauta',
-  SUSPENSO: 'Suspenso',
-  DILIGENCIA: 'Diligência',
-  PEDIDO_VISTA: 'Pedido Vista',
-  JULGADO: 'Julgado',
-};
-
 const resourceStatusColors: Record<string, string> = {
   EM_PAUTA: 'bg-blue-50 border-blue-400',
   SUSPENSO: 'bg-amber-50 border-amber-400',
   DILIGENCIA: 'bg-cyan-50 border-cyan-400',
   PEDIDO_VISTA: 'bg-rose-50 border-rose-400',
   JULGADO: 'bg-emerald-50 border-emerald-400',
-};
-
-const resourceStatusBadgeColors: Record<string, string> = {
-  EM_PAUTA: 'bg-blue-100 text-blue-700 hover:bg-blue-100',
-  SUSPENSO: 'bg-amber-100 text-amber-700 hover:bg-amber-100',
-  DILIGENCIA: 'bg-cyan-100 text-cyan-700 hover:bg-cyan-100',
-  PEDIDO_VISTA: 'bg-rose-100 text-rose-700 hover:bg-rose-100',
-  JULGADO: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100',
 };
 
 const distributionTypeLabels: Record<string, string> = {
@@ -289,6 +276,7 @@ interface SortableResourceCardProps {
   session: Session;
   canJudgeProcesses: boolean;
   canAddRemoveProcesses: boolean;
+  isSessionCompleted: boolean;
   onRemove: () => void;
   onJudge: () => void;
   onPresence: () => void;
@@ -300,6 +288,7 @@ function SortableResourceCard({
   session,
   canJudgeProcesses,
   canAddRemoveProcesses,
+  isSessionCompleted,
   onRemove,
   onJudge,
   onPresence,
@@ -324,7 +313,10 @@ function SortableResourceCard({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "bg-white rounded-lg border p-6",
+        "rounded-lg border p-6",
+        resource.status === 'EM_PAUTA'
+          ? "bg-white"
+          : resourceStatusColors[resource.status] || "bg-white",
         resource.addedAfterLastPublication && "border-l-4 border-l-purple-500"
       )}
     >
@@ -332,10 +324,11 @@ function SortableResourceCard({
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 flex-1 min-w-0">
           <div
-            {...attributes}
-            {...listeners}
+            {...(!isSessionCompleted ? attributes : {})}
+            {...(!isSessionCompleted ? listeners : {})}
             className={cn(
-              "flex items-center justify-center w-8 h-8 rounded-full font-medium text-sm flex-shrink-0 cursor-grab active:cursor-grabbing transition-colors",
+              "flex items-center justify-center w-8 h-8 rounded-full font-medium text-sm flex-shrink-0 transition-colors",
+              !isSessionCompleted && "cursor-grab active:cursor-grabbing",
               resource.attendances && resource.attendances.length > 0
                 ? "bg-primary text-primary-foreground hover:bg-primary/90"
                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -346,7 +339,7 @@ function SortableResourceCard({
 
           <div className="flex-1 min-w-0">
             <div className="mb-3">
-              <div>
+              <div className="flex items-center gap-2 flex-wrap">
                 <Link
                   href={`/ccr/recursos/${resource.resource.id}`}
                   target="_blank"
@@ -354,10 +347,15 @@ function SortableResourceCard({
                 >
                   {resource.resource.processNumber}
                 </Link>
+                {resource.status !== 'EM_PAUTA' && (
+                  <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border w-fit', getResourceStatusColor(resource.status as ResourceStatusKey))}>
+                    {getResourceStatusLabel(resource.status as ResourceStatusKey)}
+                  </span>
+                )}
               </div>
               {resource.resource.processName && (
                 <div className="text-sm text-muted-foreground">
-                  {resource.resource.processName}
+                  {resource.resource.processName} ({resource.resource.resourceNumber})
                 </div>
               )}
             </div>
@@ -418,50 +416,96 @@ function SortableResourceCard({
                 </div>
               )}
             </div>
+
+            {/* Texto da Ata - aparece quando há resultado */}
+            {resource.status !== 'EM_PAUTA' && resource.minutesText && (
+              <div className="mt-4 pt-4 border-t">
+                <div className="text-sm">
+                  <span className="font-medium">Texto da Ata: </span>
+                  <p className="text-muted-foreground mt-1 whitespace-pre-wrap text-justify">
+                    {resource.minutesText}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="flex items-start gap-2 flex-shrink-0">
-          {/* Botão Presença - aparece quando sessão está PENDENTE */}
-          {canJudgeProcesses && resource.status !== 'JULGADO' && (
-            <TooltipWrapper content="Registrar presença de partes">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onPresence}
-                className="cursor-pointer h-9 w-9 p-0"
-              >
-                <UserCheck className="h-4 w-4" />
-              </Button>
-            </TooltipWrapper>
-          )}
-
-          {/* Botão Julgar - aparece quando sessão está PENDENTE e processo ainda não julgado */}
-          {canJudgeProcesses && resource.status !== 'JULGADO' && (
+          {/* Se sessão concluída, mostrar apenas botão de Detalhes */}
+          {isSessionCompleted ? (
             <Button
               variant="outline"
               size="sm"
               className="cursor-pointer h-9"
               onClick={onJudge}
             >
-              <Gavel className="h-4 w-4 mr-2" />
-              Julgar
+              <FileText className="h-4 w-4 mr-2" />
+              Detalhes
             </Button>
-          )}
+          ) : (
+            <>
+              {/* Botão Presença - aparece quando sessão está PENDENTE */}
+              {canJudgeProcesses && (
+                <TooltipWrapper content="Registrar presença de partes">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onPresence}
+                    className="cursor-pointer h-9 w-9 p-0"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                  </Button>
+                </TooltipWrapper>
+              )}
 
-          {/* Botão Remover - aparece quando pode adicionar/remover processos */}
-          {canAddRemoveProcesses && resource.status !== 'JULGADO' && (
-            <TooltipWrapper content="Remover processo da pauta">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onRemove}
-                className="cursor-pointer h-9 w-9 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </TooltipWrapper>
+              {/* Botão Julgar/Editar - aparece quando sessão está PENDENTE */}
+              {canJudgeProcesses && (
+                <>
+                  {resource.status === 'EM_PAUTA' ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer h-9"
+                      onClick={onJudge}
+                    >
+                      <Gavel className="h-4 w-4 mr-2" />
+                      Julgar
+                    </Button>
+                  ) : (
+                    <TooltipWrapper content="Editar resultado">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="cursor-pointer h-9 w-9 p-0"
+                        onClick={onJudge}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </TooltipWrapper>
+                  )}
+                </>
+              )}
+
+              {/* Botão Remover - aparece quando pode adicionar/remover processos */}
+              {canAddRemoveProcesses && (
+                <TooltipWrapper content={resource.status !== 'EM_PAUTA' ? 'Remover resultado' : 'Remover processo da pauta'}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={onRemove}
+                    className="cursor-pointer h-9 w-9 p-0"
+                  >
+                    {resource.status !== 'EM_PAUTA' ? (
+                      <RotateCcw className="h-4 w-4" />
+                    ) : (
+                      <X className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipWrapper>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -472,11 +516,13 @@ function SortableResourceCard({
 export default function VisualizarSessaoPage() {
   const params = useParams();
   const router = useRouter();
+  const { data: authSession } = useSession();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [publishLoading, setPublishLoading] = useState(false);
   const [completeLoading, setCompleteLoading] = useState(false);
+  const [revertLoading, setRevertLoading] = useState(false);
   const [isModalClosing, setIsModalClosing] = useState(false);
   const [shouldModalAnimate, setShouldModalAnimate] = useState(false);
   const [publishData, setPublishData] = useState({
@@ -623,7 +669,7 @@ export default function VisualizarSessaoPage() {
   };
 
   const handleCompleteSession = async () => {
-    toast.warning('Tem certeza que deseja concluir esta sessão? Todos os processos devem estar julgados.', {
+    toast.warning('Tem certeza que deseja concluir esta sessão? Todos os processos em pauta devem ter resultado.', {
       duration: 10000,
       action: {
         label: 'Confirmar',
@@ -661,10 +707,46 @@ export default function VisualizarSessaoPage() {
     });
   };
 
+  const handleRevertSession = async () => {
+    toast.warning('Tem certeza que deseja reverter esta sessão para PENDENTE? Ela ficará editável novamente.', {
+      duration: 10000,
+      action: {
+        label: 'Confirmar',
+        onClick: async () => {
+          try {
+            setRevertLoading(true);
+            const response = await fetch(`/api/ccr/sessions/${params.id}/revert`, {
+              method: 'PATCH',
+            });
+
+            if (response.ok) {
+              toast.success('Sessão revertida para PENDENTE com sucesso');
+              fetchSession(); // Recarregar dados da sessão
+            } else {
+              const error = await response.json();
+              toast.error(error.error || 'Erro ao reverter sessão');
+            }
+          } catch (error) {
+            console.error('Error reverting session:', error);
+            toast.error('Erro ao reverter sessão');
+          } finally {
+            setRevertLoading(false);
+          }
+        },
+      },
+      cancel: {
+        label: 'Cancelar',
+        onClick: () => {
+          setRevertLoading(false);
+        },
+      },
+    });
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (!over || active.id === over.id || !session) {
+    if (!over || active.id === over.id || !session || session.status === 'CONCLUIDA') {
       return;
     }
 
@@ -718,8 +800,9 @@ export default function VisualizarSessaoPage() {
   const canPublishAgenda = session?.status === 'PUBLICACAO';
   const canAddRemoveProcesses = session?.status === 'PUBLICACAO' || session?.status === 'PENDENTE';
   const canJudgeProcesses = session?.status === 'PENDENTE';
-  const allProcessesJudged = session?.resources.every(r => r.status === 'JULGADO') && (session?.resources.length ?? 0) > 0;
-  const canCompleteSession = session?.status === 'PENDENTE' && allProcessesJudged;
+  const totalResources = session?.resources.length ?? 0;
+  const allProcessesHaveResult = totalResources === 0 || session?.resources.every(r => ['JULGADO', 'SUSPENSO', 'DILIGENCIA', 'PEDIDO_VISTA'].includes(r.status));
+  const canCompleteSession = session?.status === 'PENDENTE' && allProcessesHaveResult;
   const hasPublications = (session?.publications?.filter(p => p.type === 'SESSAO').length ?? 0) > 0;
 
   const formatDateTime = (date: Date | string, time: string | null) => {
@@ -950,26 +1033,30 @@ export default function VisualizarSessaoPage() {
                         <Blinds className="h-4 w-4" />
                       </Button>
                     </TooltipWrapper>
-                    <TooltipWrapper content="Gerenciar assuntos administrativos">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push(`/ccr/sessoes/${session.id}/assuntos-administrativos`)}
-                        className="cursor-pointer"
-                      >
-                        <ClipboardList className="h-4 w-4" />
-                      </Button>
-                    </TooltipWrapper>
-                    <TooltipWrapper content="Editar sessão">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push(`/ccr/sessoes/${session.id}/editar`)}
-                        className="cursor-pointer"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </TooltipWrapper>
+                    {session.status !== 'CONCLUIDA' && (
+                      <>
+                        <TooltipWrapper content="Gerenciar assuntos administrativos">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/ccr/sessoes/${session.id}/assuntos-administrativos`)}
+                            className="cursor-pointer"
+                          >
+                            <ClipboardList className="h-4 w-4" />
+                          </Button>
+                        </TooltipWrapper>
+                        <TooltipWrapper content="Editar sessão">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/ccr/sessoes/${session.id}/editar`)}
+                            className="cursor-pointer"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </TooltipWrapper>
+                      </>
+                    )}
 
                     {/* Botão Publicar Pauta - aparece quando status = PUBLICACAO */}
                     {canPublishAgenda && (
@@ -993,6 +1080,19 @@ export default function VisualizarSessaoPage() {
                       >
                         <CheckCircle2 className="h-4 w-4 mr-2" />
                         {completeLoading ? 'Concluindo...' : 'Concluir Sessão'}
+                      </Button>
+                    )}
+
+                    {/* Botão Reverter Sessão - aparece apenas para ADMIN quando sessão está CONCLUIDA */}
+                    {session.status === 'CONCLUIDA' && authSession?.user?.role === 'ADMIN' && (
+                      <Button
+                        size="sm"
+                        onClick={handleRevertSession}
+                        disabled={revertLoading}
+                        className="cursor-pointer bg-amber-600 hover:bg-amber-700"
+                      >
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        {revertLoading ? 'Revertendo...' : 'Reverter para Pendente'}
                       </Button>
                     )}
                   </div>
@@ -1064,16 +1164,18 @@ export default function VisualizarSessaoPage() {
                       {session.members.length} {session.members.length === 1 ? 'participante' : 'participantes'}
                     </CardDescription>
                   </div>
-                  <TooltipWrapper content="Editar membros participantes">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/ccr/sessoes/${session.id}/membros`)}
-                      className="cursor-pointer"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  </TooltipWrapper>
+                  {session.status !== 'CONCLUIDA' && (
+                    <TooltipWrapper content="Editar membros participantes">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/ccr/sessoes/${session.id}/membros`)}
+                        className="cursor-pointer"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </TooltipWrapper>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -1221,35 +1323,72 @@ export default function VisualizarSessaoPage() {
                             session={session}
                             canJudgeProcesses={canJudgeProcesses}
                             canAddRemoveProcesses={canAddRemoveProcesses}
+                            isSessionCompleted={session.status === 'CONCLUIDA'}
                             onRemove={() => {
-                              toast.warning('Tem certeza que deseja remover este processo da pauta?', {
-                                duration: 10000,
-                                action: {
-                                  label: 'Confirmar',
-                                  onClick: async () => {
-                                    try {
-                                      const response = await fetch(`/api/ccr/session-resources/${resource.id}`, {
-                                        method: 'DELETE',
-                                      });
+                              // Verificar se o processo tem resultado
+                              const hasResult = resource.status !== 'EM_PAUTA';
 
-                                      if (response.ok) {
-                                        toast.success('Processo removido da pauta');
-                                        fetchSession();
-                                      } else {
-                                        const errorText = await response.text();
-                                        toast.error(errorText || 'Erro ao remover processo da pauta');
+                              if (hasResult) {
+                                // Remover resultado
+                                toast.warning('Tem certeza que deseja remover o resultado deste processo? Todas as votações e votos serão excluídos.', {
+                                  duration: 10000,
+                                  action: {
+                                    label: 'Confirmar',
+                                    onClick: async () => {
+                                      try {
+                                        const response = await fetch(`/api/ccr/session-resources/${resource.id}/remove-result`, {
+                                          method: 'DELETE',
+                                        });
+
+                                        if (response.ok) {
+                                          toast.success('Resultado removido com sucesso');
+                                          fetchSession();
+                                        } else {
+                                          const error = await response.json();
+                                          toast.error(error.error || 'Erro ao remover resultado');
+                                        }
+                                      } catch (error) {
+                                        console.error('Error removing result:', error);
+                                        toast.error('Erro ao remover resultado');
                                       }
-                                    } catch (error) {
-                                      console.error('Error removing resource:', error);
-                                      toast.error('Erro ao remover processo da pauta');
-                                    }
+                                    },
                                   },
-                                },
-                                cancel: {
-                                  label: 'Cancelar',
-                                  onClick: () => { },
-                                },
-                              });
+                                  cancel: {
+                                    label: 'Cancelar',
+                                    onClick: () => { },
+                                  },
+                                });
+                              } else {
+                                // Remover da pauta
+                                toast.warning('Tem certeza que deseja remover este processo da pauta?', {
+                                  duration: 10000,
+                                  action: {
+                                    label: 'Confirmar',
+                                    onClick: async () => {
+                                      try {
+                                        const response = await fetch(`/api/ccr/session-resources/${resource.id}`, {
+                                          method: 'DELETE',
+                                        });
+
+                                        if (response.ok) {
+                                          toast.success('Processo removido da pauta');
+                                          fetchSession();
+                                        } else {
+                                          const errorText = await response.text();
+                                          toast.error(errorText || 'Erro ao remover processo da pauta');
+                                        }
+                                      } catch (error) {
+                                        console.error('Error removing resource:', error);
+                                        toast.error('Erro ao remover processo da pauta');
+                                      }
+                                    },
+                                  },
+                                  cancel: {
+                                    label: 'Cancelar',
+                                    onClick: () => { },
+                                  },
+                                });
+                              }
                             }}
                             onJudge={() => router.push(`/ccr/sessoes/${session.id}/processos/${resource.id}/julgar`)}
                             onPresence={() => router.push(`/ccr/sessoes/${session.id}/processos/${resource.id}/presenca`)}

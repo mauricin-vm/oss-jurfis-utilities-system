@@ -21,7 +21,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, HelpCircle } from 'lucide-react';
+import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 
 interface Member {
   id: string;
@@ -267,6 +268,22 @@ export function SessionVoteForm({
 
       if (response.ok) {
         toast.success('Voto registrado com sucesso');
+
+        // Resetar resultado se existir
+        await fetch(
+          `/api/ccr/sessions/${sessionId}/processos/${resourceId}/status`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              status: 'EM_PAUTA',
+              minutesText: null,
+              viewRequestedMemberId: null,
+              diligenceDaysDeadline: null,
+            }),
+          }
+        );
+
         router.push(`/ccr/sessoes/${params.id}/processos/${params.resourceId}/julgar`);
       } else {
         const error = await response.json();
@@ -337,8 +354,11 @@ export function SessionVoteForm({
             name="voteKnowledgeType"
             render={({ field }) => (
               <FormItem className="space-y-0">
-                <FormLabel className="block text-sm font-medium mb-1.5">
+                <FormLabel className="block text-sm font-medium mb-1.5 flex items-center gap-1.5">
                   Tipo <span className="text-red-500">*</span>
+                  <TooltipWrapper content="O não conhecimento refere-se à análise preliminar, enquanto o conhecimento refere-se à análise de mérito">
+                    <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                  </TooltipWrapper>
                 </FormLabel>
                 <FormControl>
                   <Select

@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
 import { getResourceStatusLabel, getResourceStatusColor } from '../../../../../hooks/resource-status';
 import { TramitationCard } from '../../../tramitacoes/components/tramitation-card';
+import { SessionCard } from '../../components/session-card';
 import { toast } from 'sonner';
 
 const typeLabels: Record<string, string> = {
@@ -38,6 +39,8 @@ export default function RecursoDetalhesPage() {
   const [loading, setLoading] = useState(true);
   const [tramitations, setTramitations] = useState<any[]>([]);
   const [loadingTramitations, setLoadingTramitations] = useState(false);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
 
   useEffect(() => {
     if (params?.id) {
@@ -67,12 +70,37 @@ export default function RecursoDetalhesPage() {
     }
   };
 
+  const fetchSessions = async () => {
+    if (!params?.id) return;
+
+    try {
+      setLoadingSessions(true);
+      const response = await fetch(`/api/ccr/resources/${params.id}/sessions`);
+      if (response.ok) {
+        const data = await response.json();
+        setSessions(data);
+      }
+    } catch (error) {
+      console.error('Error fetching sessions:', error);
+      toast.error('Erro ao carregar sessões');
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
   useEffect(() => {
     if (resource?.processNumber) {
       fetchTramitations();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resource?.processNumber]);
+
+  useEffect(() => {
+    if (params?.id) {
+      fetchSessions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params?.id]);
 
   const handleMarkAsReceived = async (id: string) => {
     try {
@@ -695,9 +723,34 @@ export default function RecursoDetalhesPage() {
           </TabsContent>
 
           <TabsContent value="julgamento" className="mt-6 overflow-y-auto max-h-[calc(100vh-140px)] focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">
-            <div className="bg-white rounded-lg border p-8 text-center">
-              <p className="text-muted-foreground">Funcionalidade em desenvolvimento</p>
-            </div>
+            <Card>
+              <CardHeader>
+                <div className="space-y-1.5">
+                  <CardTitle>Histórico de Julgamento</CardTitle>
+                  <CardDescription>Sessões em que este processo foi pautado e seus resultados.</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loadingSessions ? (
+                  <div className="flex flex-col items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto" />
+                    <p className="mt-4 text-sm text-gray-600">Carregando sessões...</p>
+                  </div>
+                ) : sessions.length === 0 ? (
+                  <div className="flex items-center justify-center h-24 border-2 border-dashed rounded-lg">
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">Este processo ainda não foi pautado em nenhuma sessão.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {sessions.map((sessionResource) => (
+                      <SessionCard key={sessionResource.id} sessionResource={sessionResource} />
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="documentos" className="mt-6 overflow-y-auto max-h-[calc(100vh-140px)] focus:outline-none focus-visible:outline-none focus:ring-0 focus-visible:ring-0">

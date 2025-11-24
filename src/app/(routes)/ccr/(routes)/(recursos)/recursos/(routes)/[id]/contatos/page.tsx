@@ -152,8 +152,6 @@ export default function ContatosPage() {
 
   const handleToggleActive = async (contactId: string, contactValue: string, currentStatus: boolean) => {
     try {
-      setActionLoading(contactId);
-
       const action = currentStatus ? 'desativar' : 'ativar';
       const actionPast = currentStatus ? 'desativado' : 'ativado';
 
@@ -162,6 +160,7 @@ export default function ContatosPage() {
         action: {
           label: 'Confirmar',
           onClick: async () => {
+            setActionLoading(contactId);
             const response = await fetch(`/api/ccr/contacts/${contactId}`, {
               method: 'PATCH',
             });
@@ -178,9 +177,7 @@ export default function ContatosPage() {
         },
         cancel: {
           label: 'Cancelar',
-          onClick: () => {
-            setActionLoading(null);
-          },
+          onClick: () => {},
         },
       });
     } catch (error) {
@@ -192,13 +189,12 @@ export default function ContatosPage() {
 
   const handleDelete = async (contactId: string, contactValue: string) => {
     try {
-      setActionLoading(contactId);
-
       toast.warning(`Tem certeza que deseja excluir permanentemente o contato?`, {
         duration: 10000,
         action: {
           label: 'Confirmar',
           onClick: async () => {
+            setActionLoading(contactId);
             const response = await fetch(`/api/ccr/contacts/${contactId}`, {
               method: 'DELETE',
             });
@@ -215,9 +211,7 @@ export default function ContatosPage() {
         },
         cancel: {
           label: 'Cancelar',
-          onClick: () => {
-            setActionLoading(null);
-          },
+          onClick: () => {},
         },
       });
     } catch (error) {

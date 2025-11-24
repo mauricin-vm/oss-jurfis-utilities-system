@@ -645,6 +645,26 @@ model SessionResourceAttendance {
   @@schema("jurfis")
 }
 
+model SessionResourceAbsence {
+  //tabela de ausências de membros durante o julgamento de um processo específico
+  id String @id @default(uuid())
+
+  sessionResourceId String
+  sessionResource   SessionResource @relation(fields: [sessionResourceId], references: [id], onDelete: Cascade)
+
+  memberId String
+  member   Member @relation("SessionResourceAbsences", fields: [memberId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sessionResourceId, memberId])
+  @@index([sessionResourceId])
+  @@index([memberId])
+  @@map("CCR_SessionResourceAbsence")
+  @@schema("jurfis")
+}
+
 model SessionResource {
   //tabela de recursos incluídos na sessão
   id         String   @id @default(uuid())
@@ -676,6 +696,7 @@ model SessionResource {
   // Relacionamentos
   sessionVotes SessionVote[]                 @relation("SessionResourceVotes") // Votos individuais no contexto desta sessão
   attendances  SessionResourceAttendance[] // Presenças de partes no julgamento
+  absences     SessionResourceAbsence[] // Ausências de membros no julgamento
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -816,6 +837,7 @@ model SessionResult {
   resource   Resource @relation("ResourceSessionResults", fields: [resourceId], references: [id], onDelete: Cascade)
 
   votingType String // "NAO_CONHECIMENTO", "CONHECIMENTO", "MERITO"
+  order      Int     @default(1) // Ordem de apresentação da votação (para ordenar cronologicamente)
 
   // Se for votação de não conhecimento com preliminar específica
   preliminaryDecisionId String?
@@ -834,9 +856,7 @@ model SessionResult {
   winningMember   Member? @relation("VotingWinnerMembers", fields: [winningMemberId], references: [id])
 
   // Contagem de votos
-  totalVotes   Int @default(0) // Total de votos válidos (favor + contra)
-  votesInFavor Int @default(0) // Votos a favor
-  votesAgainst Int @default(0) // Votos contra
+  totalVotes Int @default(0) // Total de votos válidos (conselheiros + presidente se houver)
 
   // Contagem de participação
   abstentions Int @default(0) // Abstenções (presente mas não votou)
@@ -862,6 +882,7 @@ model SessionResult {
   // Garantir apenas um resultado por tipo de votação + preliminar (se houver) por processo
   @@unique([resourceId, votingType, preliminaryDecisionId])
   @@index([resourceId])
+  @@index([resourceId, order])
   @@index([votingType])
   @@index([status])
   @@index([preliminaryDecisionId])
@@ -1136,14 +1157,15 @@ model Member {
 
   // Relacionamentos
   tramitations                Tramitation[]
-  sessionsAsPresident         Session[]               @relation("SessionPresident")
-  sessionsPresent             SessionMember[]         @relation("SessionMembersPresent")
-  sessionResourcesAsPresident SessionResource[]       @relation("SessionResourcePresident")
-  sessionResourceViewRequests SessionResource[]       @relation("SessionResourceViewRequests")
-  distributionsAsFirst        SessionDistribution[]   @relation("DistributionFirstMember")
-  minutesAsPresident          SessionMinutes[]        @relation("MinutesPresident")
-  minutesPresent              SessionMinutesMember[]  @relation("MinutesMembersPresent")
-  minutesAbsences             SessionMinutesAbsence[] @relation("MinutesAbsences")
+  sessionsAsPresident         Session[]                  @relation("SessionPresident")
+  sessionsPresent             SessionMember[]            @relation("SessionMembersPresent")
+  sessionResourcesAsPresident SessionResource[]          @relation("SessionResourcePresident")
+  sessionResourceViewRequests SessionResource[]          @relation("SessionResourceViewRequests")
+  sessionResourceAbsences     SessionResourceAbsence[]   @relation("SessionResourceAbsences")
+  distributionsAsFirst        SessionDistribution[]      @relation("DistributionFirstMember")
+  minutesAsPresident          SessionMinutes[]           @relation("MinutesPresident")
+  minutesPresent              SessionMinutesMember[]     @relation("MinutesMembersPresent")
+  minutesAbsences             SessionMinutesAbsence[]    @relation("MinutesAbsences")
 
   // Novos relacionamentos
   sessionVotes      SessionVote[]   @relation("MemberSessionVotes")
@@ -1365,7 +1387,6 @@ enum VoteType {
 
 enum ParticipationStatus {
   PRESENTE
-  AUSENTE
   IMPEDIDO
   SUSPEITO
   ABSTENCAO

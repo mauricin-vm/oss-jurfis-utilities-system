@@ -115,6 +115,7 @@ export async function POST(
             id: true,
             name: true,
             role: true,
+            gender: true,
           },
         },
         preliminaryDecision: {
@@ -202,6 +203,21 @@ async function autoGroupVotes(sessionResourceId: string) {
       (v) => v.voteKnowledgeType === 'NAO_CONHECIMENTO' && v.preliminaryDecisionId
     );
 
+    // Buscar o maior valor de order existente para este recurso
+    const maxOrderResult = await prismadb.sessionResult.findFirst({
+      where: {
+        resourceId: sessionResource.resourceId,
+      },
+      orderBy: {
+        order: 'desc',
+      },
+      select: {
+        order: true,
+      },
+    });
+
+    let currentOrder = maxOrderResult?.order ?? 0;
+
     const preliminaryGroups = new Map<string, typeof votes>();
     preliminaryVotes.forEach((vote) => {
       const key = vote.preliminaryDecisionId!;
@@ -227,12 +243,14 @@ async function autoGroupVotes(sessionResourceId: string) {
       if (existingResult) {
         resultId = existingResult.id;
       } else {
+        currentOrder++;
         const result = await prismadb.sessionResult.create({
           data: {
             resourceId: sessionResource.resourceId,
             votingType: 'NAO_CONHECIMENTO',
             preliminaryDecisionId,
             status: 'PENDENTE',
+            order: currentOrder,
           },
         });
         resultId = result.id;
@@ -269,11 +287,13 @@ async function autoGroupVotes(sessionResourceId: string) {
       if (existingResult) {
         resultId = existingResult.id;
       } else {
+        currentOrder++;
         const result = await prismadb.sessionResult.create({
           data: {
             resourceId: sessionResource.resourceId,
             votingType: 'NAO_CONHECIMENTO',
             status: 'PENDENTE',
+            order: currentOrder,
           },
         });
         resultId = result.id;
@@ -306,11 +326,13 @@ async function autoGroupVotes(sessionResourceId: string) {
       if (existingResult) {
         resultId = existingResult.id;
       } else {
+        currentOrder++;
         const result = await prismadb.sessionResult.create({
           data: {
             resourceId: sessionResource.resourceId,
             votingType: 'MERITO',
             status: 'PENDENTE',
+            order: currentOrder,
           },
         });
         resultId = result.id;
@@ -373,6 +395,7 @@ export async function GET(
             id: true,
             name: true,
             role: true,
+            gender: true,
           },
         },
         session: {

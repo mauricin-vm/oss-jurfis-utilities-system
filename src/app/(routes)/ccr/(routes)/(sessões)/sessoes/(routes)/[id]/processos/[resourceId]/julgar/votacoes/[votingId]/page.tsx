@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CCRPageWrapper } from '@/app/(routes)/ccr/components/ccr-page-wrapper';
@@ -18,7 +18,7 @@ interface Member {
   id: string;
   name: string;
   role: string;
-  gender?: string;
+  gender?: 'MASCULINO' | 'FEMININO';
 }
 
 interface Decision {
@@ -53,6 +53,12 @@ interface Vote {
   createdAt: Date;
 }
 
+interface ImpedidMember {
+  memberId: string;
+  authorityType: string;
+  authorityName: string;
+}
+
 interface VotingData {
   id: string;
   votingType: string;
@@ -60,8 +66,6 @@ interface VotingData {
   status: string;
   completedAt: Date | null;
   totalVotes: number;
-  votesInFavor: number;
-  votesAgainst: number;
   abstentions: number;
   absences: number;
   impediments: number;
@@ -79,6 +83,7 @@ interface VotingData {
   winningMember?: Member | null;
   qualityVoteMember?: Member | null;
   votes: Vote[];
+  impedidMembers?: ImpedidMember[];
 }
 
 interface SessionMember {
@@ -90,6 +95,7 @@ interface SessionData {
   id: string;
   sessionNumber: string;
   date: Date;
+  status: string;
   members: SessionMember[];
   president: Member | null;
 }
@@ -106,7 +112,11 @@ export default function VotingDetailsPage() {
   const [saving, setSaving] = useState(false);
   const [voting, setVoting] = useState<VotingData | null>(null);
   const [session, setSession] = useState<SessionData | null>(null);
+  const [absentMemberIds, setAbsentMemberIds] = useState<string[]>([]);
   const [memberVotes, setMemberVotes] = useState<Record<string, string>>({});
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  const prevShowPresidentVote = useRef<boolean>(false);
+  const [isEditingCompletedVoting, setIsEditingCompletedVoting] = useState(false);
 
   useEffect(() => {
     if (params.id && params.resourceId && params.votingId) {
@@ -141,6 +151,19 @@ export default function VotingDetailsPage() {
     }
   }, [voting]);
 
+  // Marcar automaticamente membros impedidos (autoridades)
+  useEffect(() => {
+    if (voting?.impedidMembers && voting.impedidMembers.length > 0) {
+      const impedidVotes: Record<string, string> = {};
+
+      voting.impedidMembers.forEach(impedid => {
+        impedidVotes[impedid.memberId] = 'IMPEDIDO';
+      });
+
+      setMemberVotes(prev => ({ ...prev, ...impedidVotes }));
+    }
+  }, [voting?.impedidMembers]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -165,6 +188,17 @@ export default function VotingDetailsPage() {
         const sessionData = await sessionResponse.json();
         setSession(sessionData);
       }
+
+      // Buscar ausências cadastradas
+      const absencesResponse = await fetch(
+        `/api/ccr/sessions/${params.id}/processos/${params.resourceId}/ausencias`
+      );
+
+      if (absencesResponse.ok) {
+        const absencesData = await absencesResponse.json();
+        const absentIds = absencesData.sessionResource?.absences?.map((a: any) => a.memberId) || [];
+        setAbsentMemberIds(absentIds);
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Erro ao carregar dados');
@@ -184,6 +218,22 @@ export default function VotingDetailsPage() {
           id: 'president',
           member: session.president
         } as any);
+      }
+
+      // Se o presidente NÃO deve votar mais, mas tem voto no banco, deletar
+      if (!shouldShowPresidentVote && session?.president) {
+        const presidentVote = voting?.votes.find(v => v.member.id === session.president.id);
+        if (presidentVote) {
+          const deleteResponse = await fetch(
+            `/api/ccr/sessions/${params.id}/processos/${params.resourceId}/votes/${presidentVote.id}`,
+            { method: 'DELETE' }
+          );
+
+          if (!deleteResponse.ok) {
+            toast.error(`Erro ao remover voto do presidente`);
+            return false;
+          }
+        }
       }
 
       for (const sessionMember of membersToProcess) {
@@ -266,10 +316,10 @@ export default function VotingDetailsPage() {
         // Identificar o tipo de votação para TODOS os votos
         // (votantes, ausentes, impedidos, abstenção, suspeição)
         if (voting?.votingType === 'NAO_CONHECIMENTO' ||
-            (registeredVotes.length > 0 && registeredVotes[0].voteKnowledgeType === 'NAO_CONHECIMENTO')) {
+          (registeredVotes.length > 0 && registeredVotes[0].voteKnowledgeType === 'NAO_CONHECIMENTO')) {
           // Buscar a preliminar da votação (se existir)
           const votingPreliminary = voting?.preliminaryDecision?.id ||
-                                   registeredVotes[0]?.preliminaryDecision?.id;
+            registeredVotes[0]?.preliminaryDecision?.id;
           if (votingPreliminary) {
             preliminaryDecisionId = votingPreliminary;
           }
@@ -311,6 +361,22 @@ export default function VotingDetailsPage() {
       if (options.showToast) {
         toast.success('Votos salvos com sucesso');
       }
+
+      // Resetar resultado se existir
+      await fetch(
+        `/api/ccr/sessions/${params.id}/processos/${params.resourceId}/status`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            status: 'EM_PAUTA',
+            minutesText: null,
+            viewRequestedMemberId: null,
+            diligenceDaysDeadline: null,
+          }),
+        }
+      );
+
       if (options.refetch) {
         await fetchData();
       }
@@ -324,12 +390,6 @@ export default function VotingDetailsPage() {
     }
   };
 
-  const handleCompleteVoting = () => {
-    router.push(
-      `/ccr/sessoes/${params.id}/processos/${params.resourceId}/julgar`
-    );
-  };
-
   // Separar votos
   const relatorVotes = voting?.votes.filter((v) => v.voteType === 'RELATOR') || [];
   const revisorVotes = voting?.votes.filter((v) => v.voteType === 'REVISOR') || [];
@@ -341,8 +401,33 @@ export default function VotingDetailsPage() {
   // IDs de TODOS que votaram (para verificar presidente)
   const votedMemberIds = voting?.votes.map((v) => v.member.id) || [];
 
-  // Membros disponíveis: TODOS exceto RELATOR e REVISOR
-  const allMembers = session?.members.filter((m) => !relatorRevisorMemberIds.includes(m.member.id)) || [];
+  // Verificar se é uma votação concluída que foi julgada em outra sessão ou se a sessão está concluída
+  const isCompletedFromOtherSession =
+    voting?.status === 'CONCLUIDA' &&
+    voting?.judgedInSession?.id &&
+    voting.judgedInSession.id !== params.id;
+
+  const isSessionCompleted = session?.status === 'CONCLUIDA';
+  const isReadOnly = isCompletedFromOtherSession || isSessionCompleted;
+
+  // Membros disponíveis
+  const allMembers = (() => {
+    // Se é votação concluída de outra sessão, mostrar apenas membros que TEM voto registrado
+    if (isCompletedFromOtherSession) {
+      const membersWithVotes = voting?.votes
+        .filter(v => v.voteType !== 'RELATOR' && v.voteType !== 'REVISOR')
+        .map(v => ({
+          id: v.member.id,
+          member: v.member
+        })) || [];
+      return membersWithVotes;
+    }
+
+    // Caso contrário, TODOS exceto RELATOR, REVISOR e AUSENTES
+    return session?.members.filter(
+      (m) => !relatorRevisorMemberIds.includes(m.member.id) && !absentMemberIds.includes(m.member.id)
+    ) || [];
+  })();
 
   // Ordenar membros conforme regra personalizada
   const availableMembers = (() => {
@@ -453,20 +538,36 @@ export default function VotingDetailsPage() {
     !presidentAlreadyVoting &&
     !votedMemberIds.includes(session.president.id);
 
-  // Recalcular empate em tempo real baseado em memberVotes
-  const currentTieStatus = useMemo(() => {
-    if (!session?.president) return false;
+  // Detectar empate inicial (apenas votos do banco, sem considerar interações)
+  const initialTieStatus = useMemo(() => {
+    if (!session?.president || !voting) return false;
 
-    // Agrupar votos atuais por decisão
+    const presidentId = session.president.id;
+    const allVotes = voting.votes || [];
+
+    // Verificar se todos os conselheiros (exceto presidente) votaram
+    const councilMembers = availableMembers.filter(m => m.member.id !== presidentId);
+    const councilMembersWithVotes = councilMembers.filter(cm =>
+      allVotes.some(v => v.member.id === cm.member.id)
+    );
+
+    // Se nem todos os conselheiros votaram, não há empate inicial
+    if (councilMembersWithVotes.length !== councilMembers.length) return false;
+
+    // Agrupar votos por decisão
     const votesByDecision: Record<string, number> = {};
 
-    Object.entries(memberVotes).forEach(([memberId, choice]) => {
-      // Não contar o voto do presidente
-      if (memberId === session.president?.id) return;
+    allVotes.forEach(vote => {
+      // Pular voto do presidente
+      if (vote.member.id === presidentId) return;
 
-      // Apenas contar votos válidos (seguindo relator/revisor)
-      if (choice && choice !== 'AUSENTE' && choice !== 'IMPEDIDO' && choice !== 'ABSTENCAO' && choice !== 'SUSPEITO') {
-        votesByDecision[choice] = (votesByDecision[choice] || 0) + 1;
+      // Pular votos que não são válidos para contagem
+      if (vote.participationStatus !== 'PRESENTE') return;
+
+      // Contar voto baseado em qual voto o membro seguiu
+      const followsVoteId = vote.followsVote?.id;
+      if (followsVoteId) {
+        votesByDecision[followsVoteId] = (votesByDecision[followsVoteId] || 0) + 1;
       }
     });
 
@@ -478,13 +579,147 @@ export default function VotingDetailsPage() {
     const tiedVotes = voteCounts.filter(count => count === maxVotes);
 
     return tiedVotes.length > 1;
-  }, [memberVotes, session?.president]);
+  }, [session?.president, voting, availableMembers]);
+
+  // Detectar empate dinâmico (considera apenas memberVotes após carregamento)
+  const currentTieStatus = useMemo(() => {
+    if (!session?.president) return false;
+
+    const presidentId = session.president.id;
+
+    // Verificar se TODOS os conselheiros têm voto em memberVotes
+    const allCouncilorsHaveVote = availableMembers.every(sessionMember => {
+      const memberId = sessionMember.member.id;
+      if (memberId === presidentId) return true; // Pular presidente
+
+      // Tem voto se está no estado local E não é string vazia
+      return memberVotes[memberId] !== undefined && memberVotes[memberId] !== '';
+    });
+
+    // Se nem todos votaram, não há empate para considerar
+    if (!allCouncilorsHaveVote) return false;
+
+    // Agrupar votos atuais por decisão (apenas de memberVotes)
+    const votesByDecision: Record<string, number> = {};
+
+    // Processar cada membro disponível (conselheiros, não presidente)
+    availableMembers.forEach(sessionMember => {
+      const memberId = sessionMember.member.id;
+
+      // Pular presidente
+      if (memberId === presidentId) return;
+
+      const voteChoice = memberVotes[memberId];
+
+      // Contar apenas votos válidos (seguindo relator/revisor)
+      if (voteChoice && voteChoice !== 'AUSENTE' && voteChoice !== 'IMPEDIDO' && voteChoice !== 'ABSTENCAO' && voteChoice !== 'SUSPEITO') {
+        votesByDecision[voteChoice] = (votesByDecision[voteChoice] || 0) + 1;
+      }
+    });
+
+    // Verificar se há empate
+    const voteCounts = Object.values(votesByDecision);
+    if (voteCounts.length < 2) return false;
+
+    const maxVotes = Math.max(...voteCounts);
+    const tiedVotes = voteCounts.filter(count => count === maxVotes);
+
+    return tiedVotes.length > 1;
+  }, [memberVotes, session?.president, availableMembers]);
+
+  // Verificar se todos os conselheiros votaram (considera apenas memberVotes)
+  const allCouncilorsVoted = useMemo(() => {
+    if (!session?.president) return false;
+
+    const presidentId = session.president.id;
+
+    return availableMembers.every(sessionMember => {
+      const memberId = sessionMember.member.id;
+      if (memberId === presidentId) return true; // Pular presidente
+
+      // Tem voto se está no estado local E não é string vazia
+      // (considera AUSENTE, IMPEDIDO, ABSTENCAO, SUSPEITO e votos válidos)
+      return memberVotes[memberId] !== undefined && memberVotes[memberId] !== '';
+    });
+  }, [session?.president, availableMembers, memberVotes]);
 
   // Mostrar linha do presidente baseado no estado atual
-  const shouldShowPresidentVote = currentTieStatus &&
-    session?.president &&
-    !presidentAlreadyVoting &&
-    !votedMemberIds.includes(session.president.id);
+  // CARREGAMENTO INICIAL (sem interação):
+  //   - Mostrar se presidente tem voto no banco OU (todos votaram E há empate)
+  // APÓS INTERAÇÃO:
+  //   - Mostrar apenas se há empate atual entre conselheiros
+  // IMPORTANTE: Só mostra se TODOS os conselheiros votaram
+  const shouldShowPresidentVote = useMemo(() => {
+    if (!session?.president || presidentAlreadyVoting) return false;
+
+    // SEMPRE requer que todos os conselheiros tenham votado
+    if (!allCouncilorsVoted) return false;
+
+    if (!hasUserInteracted) {
+      // Carregamento inicial: mostrar se presidente votou OU há empate inicial
+      const presidentHasVoteInDB = votedMemberIds.includes(session.president.id);
+      return presidentHasVoteInDB || initialTieStatus;
+    } else {
+      // Após interação: baseado apenas no empate atual
+      return currentTieStatus;
+    }
+  }, [session?.president, presidentAlreadyVoting, allCouncilorsVoted, hasUserInteracted, votedMemberIds, initialTieStatus, currentTieStatus]);
+
+  // Limpar voto do presidente quando linha DESAPARECE (desempate)
+  useEffect(() => {
+    if (hasUserInteracted && session?.president) {
+      const presidentId = session.president.id;
+
+      // Detectar mudança de true para false (linha desapareceu por desempate)
+      if (!shouldShowPresidentVote && prevShowPresidentVote.current) {
+        // SEMPRE limpar o voto do presidente do estado local ao desempatar
+        // (independente de ter voto no banco ou não)
+        if (memberVotes[presidentId]) {
+          setMemberVotes(prev => {
+            const newVotes = { ...prev };
+            delete newVotes[presidentId];
+            return newVotes;
+          });
+        }
+      }
+
+      // Atualizar valor anterior
+      prevShowPresidentVote.current = shouldShowPresidentVote;
+    }
+  }, [shouldShowPresidentVote, hasUserInteracted, session?.president, memberVotes]);
+
+  // Calcular se há vencedor e quem é
+  const winnerInfo = useMemo(() => {
+    if (!allCouncilorsVoted || !voting) return null;
+
+    const presidentId = session?.president?.id;
+    const validMemberIds = new Set(availableMembers.map(m => m.member.id));
+    if (shouldShowPresidentVote && presidentId) {
+      validMemberIds.add(presidentId);
+    }
+
+    // Calcular totais
+    const voteTotals = registeredVotes.map(vote => ({
+      voteId: vote.id,
+      voteMember: vote.member,
+      total: Object.entries(memberVotes)
+        .filter(([memberId, choice]) => validMemberIds.has(memberId) && choice === vote.id)
+        .length
+    }));
+
+    const maxTotal = Math.max(...voteTotals.map(v => v.total), 0);
+    const winners = voteTotals.filter(v => v.total === maxTotal && v.total > 0);
+
+    // Há vencedor se houver exatamente um com o máximo de votos
+    if (winners.length === 1 && maxTotal > 0) {
+      return {
+        member: winners[0].voteMember,
+        votes: winners[0].total
+      };
+    }
+
+    return null;
+  }, [allCouncilorsVoted, voting, session?.president, availableMembers, shouldShowPresidentVote, memberVotes, registeredVotes]);
 
   const breadcrumbs = [
     { label: 'Menu', href: '/' },
@@ -840,13 +1075,13 @@ export default function VotingDetailsPage() {
         </Card>
 
         {/* Sistema de Votação */}
-        {voting.status === 'PENDENTE' && (availableMembers.length > 0 || shouldShowPresidentVote) && (
+        {(availableMembers.length > 0 || shouldShowPresidentVote) && (
           <div className="space-y-6">
             <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
               {/* Cabeçalho da Tabela */}
               <div className="grid grid-cols-[250px_1fr] bg-gray-100 border-b">
                 <div className="p-4 border-r bg-gray-200"></div>
-                <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${registeredVotes.length}, 1fr) repeat(4, 70px)` }}>
+                <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${registeredVotes.length}, 1fr) repeat(3, 70px)` }}>
                   {registeredVotes.map((vote) => (
                     <div key={vote.id} className="p-4 text-center border-r last:border-r-0">
                       <p className="font-medium text-sm">{vote.member.name}</p>
@@ -860,9 +1095,6 @@ export default function VotingDetailsPage() {
                     </div>
                   ))}
                   <div className="p-1 flex items-center justify-center border-r">
-                    <p className="font-medium text-xs">Ausente</p>
-                  </div>
-                  <div className="p-1 flex items-center justify-center border-r">
                     <p className="font-medium text-xs">Impedido</p>
                   </div>
                   <div className="p-1 flex items-center justify-center border-r">
@@ -875,21 +1107,35 @@ export default function VotingDetailsPage() {
               </div>
 
               {/* Linhas dos Conselheiros */}
-              {availableMembers.map((sessionMember) => (
-                <div
-                  key={sessionMember.member.id}
-                  className="grid grid-cols-[250px_1fr] border-b last:border-b-0"
-                >
-                  <div className="p-4 border-r bg-gray-50">
-                    <p className="text-sm font-medium">{sessionMember.member.name}</p>
-                    <p className="text-xs text-muted-foreground">{sessionMember.member.role}</p>
-                  </div>
-                  <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${registeredVotes.length}, 1fr) repeat(4, 70px)` }}>
+              {availableMembers.map((sessionMember) => {
+                const impediment = voting?.impedidMembers?.find(imp => imp.memberId === sessionMember.member.id);
+                const isImpedido = !!impediment;
+
+                return (
+                  <div
+                    key={sessionMember.member.id}
+                    className={cn(
+                      "grid grid-cols-[250px_1fr] border-b last:border-b-0",
+                      isImpedido && "opacity-70"
+                    )}
+                  >
+                    <div className="p-4 border-r bg-gray-50">
+                      <p className="text-sm font-medium">{sessionMember.member.name}</p>
+                      <p className="text-xs text-muted-foreground">{sessionMember.member.role}</p>
+                      {isImpedido && (
+                        <p className="text-xs text-red-600 mt-1 font-medium">
+                          Impedido - {impediment.authorityType}
+                        </p>
+                      )}
+                    </div>
+                  <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${registeredVotes.length}, 1fr) repeat(3, 70px)` }}>
                     {/* Célula clicável para cada voto registrado */}
                     {registeredVotes.map((vote) => (
                       <div
                         key={vote.id}
                         onClick={() => {
+                          if (isReadOnly || isImpedido) return;
+                          setHasUserInteracted(true);
                           setMemberVotes((prev) => ({
                             ...prev,
                             [sessionMember.member.id]:
@@ -897,7 +1143,10 @@ export default function VotingDetailsPage() {
                           }));
                         }}
                         className={cn(
-                          "p-4 flex items-center justify-center border-r cursor-pointer transition-colors hover:bg-gray-100",
+                          "p-4 flex items-center justify-center border-r transition-colors",
+                          isReadOnly || isImpedido
+                            ? ""
+                            : "cursor-pointer hover:bg-gray-100",
                           memberVotes[sessionMember.member.id] === vote.id && getCellBackgroundColor(vote)
                         )}
                       >
@@ -905,24 +1154,11 @@ export default function VotingDetailsPage() {
                       </div>
                     ))}
 
-                    {/* Células clicáveis para Ausente/Impedido/Abstenção/Suspeição */}
+                    {/* Células clicáveis para Impedido/Abstenção/Suspeição */}
                     <div
                       onClick={() => {
-                        setMemberVotes((prev) => ({
-                          ...prev,
-                          [sessionMember.member.id]:
-                            prev[sessionMember.member.id] === 'AUSENTE' ? '' : 'AUSENTE',
-                        }));
-                      }}
-                      className={cn(
-                        "p-1 flex items-center justify-center border-r cursor-pointer transition-colors hover:bg-gray-100",
-                        memberVotes[sessionMember.member.id] === 'AUSENTE' && "bg-gray-900 hover:bg-gray-800"
-                      )}
-                    >
-                      <div className="w-full h-full" />
-                    </div>
-                    <div
-                      onClick={() => {
+                        if (isReadOnly || isImpedido) return;
+                        setHasUserInteracted(true);
                         setMemberVotes((prev) => ({
                           ...prev,
                           [sessionMember.member.id]:
@@ -930,7 +1166,10 @@ export default function VotingDetailsPage() {
                         }));
                       }}
                       className={cn(
-                        "p-1 flex items-center justify-center border-r cursor-pointer transition-colors hover:bg-gray-100",
+                        "p-1 flex items-center justify-center border-r transition-colors",
+                        isReadOnly || isImpedido
+                          ? ""
+                          : "cursor-pointer hover:bg-gray-100",
                         memberVotes[sessionMember.member.id] === 'IMPEDIDO' && "bg-gray-900 hover:bg-gray-800"
                       )}
                     >
@@ -938,6 +1177,8 @@ export default function VotingDetailsPage() {
                     </div>
                     <div
                       onClick={() => {
+                        if (isReadOnly || isImpedido) return;
+                        setHasUserInteracted(true);
                         setMemberVotes((prev) => ({
                           ...prev,
                           [sessionMember.member.id]:
@@ -945,7 +1186,10 @@ export default function VotingDetailsPage() {
                         }));
                       }}
                       className={cn(
-                        "p-1 flex items-center justify-center border-r cursor-pointer transition-colors hover:bg-gray-100",
+                        "p-1 flex items-center justify-center border-r transition-colors",
+                        isReadOnly || isImpedido
+                          ? ""
+                          : "cursor-pointer hover:bg-gray-100",
                         memberVotes[sessionMember.member.id] === 'ABSTENCAO' && "bg-gray-900 hover:bg-gray-800"
                       )}
                     >
@@ -953,6 +1197,8 @@ export default function VotingDetailsPage() {
                     </div>
                     <div
                       onClick={() => {
+                        if (isReadOnly || isImpedido) return;
+                        setHasUserInteracted(true);
                         setMemberVotes((prev) => ({
                           ...prev,
                           [sessionMember.member.id]:
@@ -960,7 +1206,10 @@ export default function VotingDetailsPage() {
                         }));
                       }}
                       className={cn(
-                        "p-1 flex items-center justify-center cursor-pointer transition-colors hover:bg-gray-100",
+                        "p-1 flex items-center justify-center transition-colors",
+                        isReadOnly || isImpedido
+                          ? ""
+                          : "cursor-pointer hover:bg-gray-100",
                         memberVotes[sessionMember.member.id] === 'SUSPEITO' && "bg-gray-900 hover:bg-gray-800"
                       )}
                     >
@@ -968,53 +1217,67 @@ export default function VotingDetailsPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
 
               {/* Linha do Presidente - Voto de Qualidade */}
               {shouldShowPresidentVote && session?.president && (
-                <div className="grid grid-cols-[250px_1fr] border-b last:border-b-0">
-                  <div className="p-4 border-r bg-gray-50">
-                    <p className="text-sm font-medium">{session.president.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {session.president.role} • Voto de Minerva
-                    </p>
+                <>
+                  {/* Linha de separação antes do presidente */}
+                  <div className="grid grid-cols-[250px_1fr] bg-gray-100 border-y">
+                    <div className="p-2 border-r bg-gray-200">
+                      <p className="text-xs font-semibold text-gray-700">Voto de Minerva</p>
+                    </div>
+                    <div className="p-2"></div>
                   </div>
-                  <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${registeredVotes.length}, 1fr) repeat(4, 70px)` }}>
-                    {/* Célula clicável para cada voto registrado */}
-                    {registeredVotes.map((vote) => (
-                      <div
-                        key={vote.id}
-                        onClick={() => {
-                          setMemberVotes((prev) => ({
-                            ...prev,
-                            [session.president!.id]:
-                              prev[session.president!.id] === vote.id ? '' : vote.id,
-                          }));
-                        }}
-                        className={cn(
-                          "p-4 flex items-center justify-center border-r cursor-pointer transition-colors hover:bg-gray-100",
-                          memberVotes[session.president.id] === vote.id && getCellBackgroundColor(vote)
-                        )}
-                      >
+
+                  {/* Linha do presidente */}
+                  <div className="grid grid-cols-[250px_1fr] border-b last:border-b-0">
+                    <div className="p-4 border-r bg-gray-50">
+                      <p className="text-sm font-medium">{session.president.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {session.president.role}
+                      </p>
+                    </div>
+                    <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${registeredVotes.length}, 1fr) repeat(3, 70px)` }}>
+                      {/* Célula clicável para cada voto registrado */}
+                      {registeredVotes.map((vote) => (
+                        <div
+                          key={vote.id}
+                          onClick={() => {
+                            if (isReadOnly) return;
+                            setHasUserInteracted(true);
+                            setMemberVotes((prev) => ({
+                              ...prev,
+                              [session.president!.id]:
+                                prev[session.president!.id] === vote.id ? '' : vote.id,
+                            }));
+                          }}
+                          className={cn(
+                            "p-4 flex items-center justify-center border-r transition-colors",
+                            isReadOnly
+                              ? ""
+                              : "cursor-pointer hover:bg-gray-100",
+                            memberVotes[session.president.id] === vote.id && getCellBackgroundColor(vote)
+                          )}
+                        >
+                          <div className="w-full h-full" />
+                        </div>
+                      ))}
+
+                      {/* Células desabilitadas para Impedido/Abstenção/Suspeição */}
+                      <div className="p-1 flex items-center justify-center border-r bg-gray-50">
                         <div className="w-full h-full" />
                       </div>
-                    ))}
-
-                    {/* Células desabilitadas para Ausente/Impedido/Abstenção/Suspeição */}
-                    <div className="p-1 flex items-center justify-center border-r bg-gray-50 cursor-not-allowed opacity-50">
-                      <div className="w-full h-full" />
-                    </div>
-                    <div className="p-1 flex items-center justify-center border-r bg-gray-50 cursor-not-allowed opacity-50">
-                      <div className="w-full h-full" />
-                    </div>
-                    <div className="p-1 flex items-center justify-center border-r bg-gray-50 cursor-not-allowed opacity-50">
-                      <div className="w-full h-full" />
-                    </div>
-                    <div className="p-1 flex items-center justify-center bg-gray-50 cursor-not-allowed opacity-50">
-                      <div className="w-full h-full" />
+                      <div className="p-1 flex items-center justify-center border-r bg-gray-50">
+                        <div className="w-full h-full" />
+                      </div>
+                      <div className="p-1 flex items-center justify-center bg-gray-50">
+                        <div className="w-full h-full" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                </>
               )}
 
               {/* Linha de Total */}
@@ -1022,18 +1285,33 @@ export default function VotingDetailsPage() {
                 <div className="p-4 border-r bg-gray-200">
                   <p className="text-sm font-semibold text-gray-700">Total</p>
                 </div>
-                <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${registeredVotes.length}, 1fr) repeat(4, 70px)` }}>
+                <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${registeredVotes.length}, 1fr) repeat(3, 70px)` }}>
                   {(() => {
-                    // Calcular totais
+                    // IDs dos membros que devem ser contados:
+                    // 1. Todos em availableMembers
+                    // 2. Presidente, se shouldShowPresidentVote for verdadeiro
+                    const validMemberIds = new Set(availableMembers.map(m => m.member.id));
+                    if (shouldShowPresidentVote && session?.president) {
+                      validMemberIds.add(session.president.id);
+                    }
+
+                    // Calcular totais apenas para membros válidos
                     const voteTotals = registeredVotes.map(vote => ({
                       id: vote.id,
-                      total: Object.values(memberVotes).filter(choice => choice === vote.id).length
+                      total: Object.entries(memberVotes)
+                        .filter(([memberId, choice]) => validMemberIds.has(memberId) && choice === vote.id)
+                        .length
                     }));
+
+                    // Verificar se todos os conselheiros votaram
+                    const allCouncilorsVoted = availableMembers.every(member =>
+                      memberVotes[member.member.id] !== undefined && memberVotes[member.member.id] !== ''
+                    );
 
                     // Encontrar maior total
                     const maxTotal = Math.max(...voteTotals.map(v => v.total), 0);
                     const winnersCount = voteTotals.filter(v => v.total === maxTotal && v.total > 0).length;
-                    const hasWinner = winnersCount === 1 && maxTotal > 0;
+                    const hasWinner = winnersCount === 1 && maxTotal > 0 && allCouncilorsVoted;
 
                     return voteTotals.map((voteData) => {
                       const isWinner = hasWinner && voteData.total === maxTotal;
@@ -1049,10 +1327,17 @@ export default function VotingDetailsPage() {
                       );
                     });
                   })()}
-                  {['AUSENTE', 'IMPEDIDO', 'ABSTENCAO', 'SUSPEITO'].map((status, index) => {
-                    const total = Object.values(memberVotes).filter(choice => choice === status).length;
+                  {['IMPEDIDO', 'ABSTENCAO', 'SUSPEITO'].map((status, index) => {
+                    // Contar apenas para membros válidos
+                    const validMemberIds = new Set(availableMembers.map(m => m.member.id));
+                    if (shouldShowPresidentVote && session?.president) {
+                      validMemberIds.add(session.president.id);
+                    }
+                    const total = Object.entries(memberVotes)
+                      .filter(([memberId, choice]) => validMemberIds.has(memberId) && choice === status)
+                      .length;
                     return (
-                      <div key={status} className={cn("p-1 flex items-center justify-center", index < 3 && "border-r")}>
+                      <div key={status} className={cn("p-1 flex items-center justify-center", index < 2 && "border-r")}>
                         <p className="text-lg font-bold text-gray-900">{total}</p>
                       </div>
                     );
@@ -1061,131 +1346,164 @@ export default function VotingDetailsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <Button
-                onClick={async () => {
-                  // Salvar votos pendentes SEM mostrar toast e SEM recarregar
-                  const saved = await handleSaveVotes('VOTANTE', { showToast: false, refetch: false });
-                  if (!saved) return;
-
-                  // Aguardar um pouco para garantir que os dados foram salvos
-                  await new Promise(resolve => setTimeout(resolve, 500));
-
-                  // Buscar dados atualizados para verificar resultado
-                  const votingResponse = await fetch(
-                    `/api/ccr/sessions/${params.id}/processos/${params.resourceId}/votings/${params.votingId}`
-                  );
-
-                  let resultMessage = '';
-                  if (votingResponse.ok) {
-                    const updatedVoting = await votingResponse.json();
-
-                    // Agrupar votos por decisão (followsVote)
-                    const votesByDecision: Record<string, { count: number, member: any }> = {};
-
-                    updatedVoting.votes.forEach((vote: any) => {
-                      if (vote.participationStatus !== 'PRESENTE') return;
-
-                      // Agrupar pelo voto seguido ou pelo próprio voto (relator/revisor)
-                      const key = vote.followsVote?.id || vote.id;
-
-                      if (!votesByDecision[key]) {
-                        votesByDecision[key] = {
-                          count: 0,
-                          member: vote.followsVote?.member || vote.member
-                        };
-                      }
-                      votesByDecision[key].count++;
-                    });
-
-                    // Verificar empate
-                    const results = Object.values(votesByDecision);
-                    const maxVotes = results.length > 0 ? Math.max(...results.map(r => r.count)) : 0;
-                    const winnersCount = results.filter(r => r.count === maxVotes).length;
-                    const hasEmpate = winnersCount > 1;
-
-                    // Verificar se presidente votou
-                    const presidenteVotou = updatedVoting.votes.some((v: any) =>
-                      v.member.id === session?.president?.id
-                    );
-
-                    // Calcular resultado apenas se:
-                    // 1. Não há empate, OU
-                    // 2. Há empate e presidente já votou
-                    const shouldShowResult = !hasEmpate || presidenteVotou;
-
-                    if (shouldShowResult && results.length > 0) {
-                      const winner = results.find(r => r.count === maxVotes);
-
-                      if (winner) {
-                        const article = winner.member.gender === 'FEMININO' ? 'da' : 'do';
-                        const voteWord = winner.count === 1 ? 'voto' : 'votos';
-                        resultMessage = ` Resultado: ${winner.count} ${voteWord} a favor da posição ${article} ${winner.member.name}.`;
-                      }
+            {/* Botões de ação - Ocultar se for votação de outra sessão ou se a sessão estiver concluída */}
+            {!isCompletedFromOtherSession && session?.status !== 'CONCLUIDA' && (
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    router.push(`/ccr/sessoes/${params.id}/processos/${params.resourceId}/julgar`);
+                  }}
+                  className="cursor-pointer"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                onClick={() => {
+                  // Se está editando votação concluída
+                  if (voting.status === 'CONCLUIDA') {
+                    // Verificar se há vencedor
+                    if (!winnerInfo) {
+                      toast.error('Não é possível salvar a votação sem um vencedor definido. Todos os conselheiros devem votar e deve haver uma decisão vencedora.', {
+                        duration: 5000
+                      });
+                      return;
                     }
-                  }
 
-                  // Mostrar único toast com resultado (se houver)
-                  if (resultMessage) {
-                    toast.success(`Votação concluída!${resultMessage}`, { duration: 5000 });
+                    // Mostrar sonner de confirmação para atualizar votação
+                    const article = winnerInfo.member.gender === 'FEMININO' ? 'da' : 'do';
+                    const voteWord = winnerInfo.votes === 1 ? 'voto' : 'votos';
+
+                    toast.warning(`Atualizar votação concluída? Novo vencedor: ${winnerInfo.votes} ${voteWord} a favor ${article} ${winnerInfo.member.name}`, {
+                      duration: 10000,
+                      className: 'min-w-[450px]',
+                      action: {
+                        label: 'Confirmar Atualização',
+                        onClick: async () => {
+                          try {
+                            setSaving(true);
+
+                            // Salvar votos
+                            const saved = await handleSaveVotes('VOTANTE', { showToast: false, refetch: false });
+                            if (!saved) {
+                              toast.error('Erro ao salvar votos');
+                              setSaving(false);
+                              return;
+                            }
+
+                            // Atualizar votação concluída
+                            const response = await fetch(
+                              `/api/ccr/sessions/${params.id}/processos/${params.resourceId}/votings/${params.votingId}/complete`,
+                              {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  winningMemberId: winnerInfo.member.id,
+                                }),
+                              }
+                            );
+
+                            if (!response.ok) {
+                              const error = await response.json();
+                              toast.error(error.error || 'Erro ao atualizar votação');
+                              setSaving(false);
+                              return;
+                            }
+
+                            toast.success('Votação atualizada com sucesso!');
+
+                            // Redirecionar para página de julgar processo
+                            router.push(`/ccr/sessoes/${params.id}/processos/${params.resourceId}/julgar`);
+                          } catch (error) {
+                            console.error('Error updating voting:', error);
+                            toast.error('Erro ao atualizar votação');
+                            setSaving(false);
+                          }
+                        },
+                      },
+                      cancel: {
+                        label: 'Cancelar',
+                        onClick: () => {},
+                      },
+                    });
                   } else {
-                    toast.success('Votação concluída com sucesso!');
-                  }
+                    // Votação pendente - concluir pela primeira vez
+                    // Verificar se há vencedor
+                    if (!winnerInfo) {
+                      toast.error('Não é possível concluir a votação sem um vencedor definido. Todos os conselheiros devem votar e deve haver uma decisão vencedora.', {
+                        duration: 5000
+                      });
+                      return;
+                    }
 
-                  // Redirecionar para página de julgar processo
-                  await handleCompleteVoting();
+                    // Mostrar sonner de confirmação com o vencedor
+                    const article = winnerInfo.member.gender === 'FEMININO' ? 'da' : 'do';
+                    const voteWord = winnerInfo.votes === 1 ? 'voto' : 'votos';
+
+                    toast.success(`Vencedor: ${winnerInfo.votes} ${voteWord} a favor da posição ${article} ${winnerInfo.member.name}`, {
+                      duration: 10000,
+                      className: 'min-w-[450px]',
+                      action: {
+                        label: 'Confirmar e Concluir',
+                        onClick: async () => {
+                          try {
+                            setSaving(true);
+
+                            // Salvar votos pendentes primeiro
+                            const saved = await handleSaveVotes('VOTANTE', { showToast: false, refetch: false });
+                            if (!saved) {
+                              toast.error('Erro ao salvar votos');
+                              setSaving(false);
+                              return;
+                            }
+
+                            // Marcar votação como concluída
+                            const response = await fetch(
+                              `/api/ccr/sessions/${params.id}/processos/${params.resourceId}/votings/${params.votingId}/complete`,
+                              {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  winningMemberId: winnerInfo.member.id,
+                                }),
+                              }
+                            );
+
+                            if (!response.ok) {
+                              const error = await response.json();
+                              toast.error(error.error || 'Erro ao concluir votação');
+                              setSaving(false);
+                              return;
+                            }
+
+                            toast.success('Votação concluída com sucesso!');
+
+                            // Redirecionar para página de julgar processo
+                            router.push(`/ccr/sessoes/${params.id}/processos/${params.resourceId}/julgar`);
+                          } catch (error) {
+                            console.error('Error completing voting:', error);
+                            toast.error('Erro ao concluir votação');
+                            setSaving(false);
+                          }
+                        },
+                      },
+                      cancel: {
+                        label: 'Cancelar',
+                        onClick: () => {},
+                      },
+                    });
+                  }
                 }}
                 disabled={saving}
                 className="cursor-pointer"
               >
-                Concluir Votação
+                {voting.status === 'CONCLUIDA' ? 'Salvar Alterações' : 'Concluir Votação'}
               </Button>
-            </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Card de Resultado (se já concluída) */}
-        {voting.status === 'CONCLUIDA' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Resultado da Votação</CardTitle>
-              <CardDescription>
-                Votação concluída em{' '}
-                {voting.completedAt &&
-                  format(new Date(voting.completedAt), 'dd/MM/yyyy', { locale: ptBR })}
-                .
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {voting.winningMember && (
-                  <div className="space-y-0">
-                    <label className="block text-sm font-medium mb-1.5">Voto Vencedor</label>
-                    <p className="text-sm">{voting.winningMember.name}</p>
-                  </div>
-                )}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div className="space-y-0">
-                    <label className="block text-sm font-medium mb-1.5">Total</label>
-                    <p className="text-sm">{voting.totalVotes}</p>
-                  </div>
-                  <div className="space-y-0">
-                    <label className="block text-sm font-medium mb-1.5">A Favor</label>
-                    <p className="text-sm">{voting.votesInFavor}</p>
-                  </div>
-                  <div className="space-y-0">
-                    <label className="block text-sm font-medium mb-1.5">Contra</label>
-                    <p className="text-sm">{voting.votesAgainst}</p>
-                  </div>
-                  <div className="space-y-0">
-                    <label className="block text-sm font-medium mb-1.5">Abstenções</label>
-                    <p className="text-sm">{voting.abstentions}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </CCRPageWrapper>
   );

@@ -3,8 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prismadb from '@/lib/prismadb';
 
-// PATCH /api/ccr/sessions/[id]/processos/[resourceId]/votings/[votingId]/complete - Concluir votação
-export async function PATCH(
+// POST /api/ccr/sessions/[id]/processos/[resourceId]/votings/[votingId]/complete - Concluir votação
+export async function POST(
   req: Request,
   {
     params,
@@ -21,19 +21,7 @@ export async function PATCH(
 
     const { id: sessionId, resourceId, votingId } = await params;
     const body = await req.json();
-    const {
-      winningMemberId,
-      qualityVoteUsed,
-      qualityVoteMemberId,
-      finalText,
-      totalVotes,
-      votesInFavor,
-      votesAgainst,
-      abstentions,
-      absences,
-      impediments,
-      suspicions,
-    } = body;
+    const { winningMemberId } = body;
 
     // Validações
     if (!winningMemberId) {
@@ -47,7 +35,16 @@ export async function PATCH(
     const result = await prismadb.sessionResult.findUnique({
       where: { id: votingId },
       include: {
-        votes: true,
+        votes: {
+          include: {
+            member: true,
+            followsVote: {
+              include: {
+                member: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -55,18 +52,44 @@ export async function PATCH(
       return NextResponse.json({ error: 'Resultado não encontrado' }, { status: 404 });
     }
 
-    if (result.status === 'CONCLUIDA') {
-      return NextResponse.json({ error: 'Votação já foi concluída' }, { status: 400 });
-    }
-
-    // Verificar se o membro vencedor fez parte da votação
-    const winningVote = result.votes.find((v) => v.memberId === winningMemberId);
+    // Verificar se o membro vencedor fez parte da votação (deve ser relator ou revisor)
+    const winningVote = result.votes.find(
+      (v) => v.member.id === winningMemberId && (v.voteType === 'RELATOR' || v.voteType === 'REVISOR')
+    );
     if (!winningVote) {
       return NextResponse.json(
         { error: 'Membro vencedor não está entre os votos desta votação' },
         { status: 400 }
       );
     }
+
+    // Calcular totais automaticamente dos votos
+    let totalVotes = 0;
+    let abstentions = 0;
+    let absences = 0;
+    let impediments = 0;
+    let suspicions = 0;
+    let qualityVoteUsed = false;
+    let qualityVoteMemberId: string | null = null;
+
+    result.votes.forEach((vote) => {
+      if (vote.participationStatus === 'PRESENTE' && vote.followsVote) {
+        totalVotes++;
+        // Verificar se é voto de qualidade (presidente)
+        if (vote.voteType === 'PRESIDENTE') {
+          qualityVoteUsed = true;
+          qualityVoteMemberId = vote.memberId;
+        }
+      } else if (vote.participationStatus === 'ABSTENCAO') {
+        abstentions++;
+      } else if (vote.participationStatus === 'AUSENTE') {
+        absences++;
+      } else if (vote.participationStatus === 'IMPEDIDO') {
+        impediments++;
+      } else if (vote.participationStatus === 'SUSPEITO') {
+        suspicions++;
+      }
+    });
 
     // Atualizar o resultado
     const updatedResult = await prismadb.sessionResult.update({
@@ -78,15 +101,12 @@ export async function PATCH(
         winningVoteId: winningVote.id,
         winningMemberId,
         qualityVoteUsed,
-        qualityVoteMemberId: qualityVoteUsed ? qualityVoteMemberId : null,
-        finalText: finalText || null,
+        qualityVoteMemberId,
         totalVotes,
-        votesInFavor,
-        votesAgainst,
-        abstentions: abstentions || 0,
-        absences: absences || 0,
-        impediments: impediments || 0,
-        suspicions: suspicions || 0,
+        abstentions,
+        absences,
+        impediments,
+        suspicions,
       },
       include: {
         preliminaryDecision: {
@@ -160,7 +180,7 @@ export async function PATCH(
 
     return NextResponse.json(resultWithLabel);
   } catch (error) {
-    console.log('[VOTING_COMPLETE_PATCH]', error);
+    console.log('[VOTING_COMPLETE_POST]', error);
     return new NextResponse('Internal error', { status: 500 });
   }
 }

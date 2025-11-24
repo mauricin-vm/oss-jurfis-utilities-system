@@ -252,6 +252,13 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Footer / Créditos */}
+      <footer className="flex h-12 shrink-0 items-center justify-center">
+        <p className="text-xs text-muted-foreground">
+          Desenvolvido por <span className="font-medium">Virtus Code</span>
+        </p>
+      </footer>
+
       {/* Onboarding Modal */}
       <OnboardingModal
         isOpen={showOnboarding}
