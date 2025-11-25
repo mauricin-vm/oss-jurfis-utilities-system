@@ -209,11 +209,20 @@ export default function AdicionarProcessoPage() {
       if (response.ok) {
         const data = await response.json();
         setSession(data);
-        // Extrair membros da sessão e ordenar por nome
+        // Extrair membros da sessão e incluir o presidente (se houver)
         if (data.members && Array.isArray(data.members)) {
-          const sessionMembers = data.members
-            .map((sm: SessionMember) => sm.member)
-            .sort((a, b) => a.name.localeCompare(b.name));
+          const sessionMembers = data.members.map((sm: SessionMember) => sm.member);
+
+          // Adicionar presidente se ele não estiver na lista de membros
+          if (data.president) {
+            const presidentExists = sessionMembers.some(m => m.id === data.president.id);
+            if (!presidentExists) {
+              sessionMembers.push(data.president);
+            }
+          }
+
+          // Ordenar por nome
+          sessionMembers.sort((a, b) => a.name.localeCompare(b.name));
           setMembers(sessionMembers);
         } else {
           setMembers([]);

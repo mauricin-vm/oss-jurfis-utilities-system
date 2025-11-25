@@ -188,6 +188,7 @@ interface JudgmentData {
     minutesText: string | null;
     diligenceDaysDeadline: number | null;
     viewRequestedBy: Member | null;
+    specificPresident: Member | null;
     attendances: Attendance[];
     absences: Absence[];
     resource: {
@@ -205,6 +206,7 @@ interface JudgmentData {
     sessionNumber: string;
     date: Date;
     status: string;
+    president: Member | null;
     members: SessionMember[];
   };
   distribution: Distribution | null;
@@ -258,6 +260,7 @@ export default function JulgarProcessoPage() {
   const [diligenceDays, setDiligenceDays] = useState('');
   const [minutesText, setMinutesText] = useState('');
   const [selectedResult, setSelectedResult] = useState<string | null>(null);
+  const [specificPresidentId, setSpecificPresidentId] = useState<string>('');
 
   // Configurar sensors para drag and drop
   const sensors = useSensors(
@@ -278,6 +281,7 @@ export default function JulgarProcessoPage() {
       setMinutesText(data.sessionResource.minutesText || '');
       setViewRequestedMemberId(data.sessionResource.viewRequestedBy?.id || '');
       setDiligenceDays(data.sessionResource.diligenceDaysDeadline?.toString() || '');
+      setSpecificPresidentId(data.sessionResource.specificPresident?.id || '');
 
       // Marcar o tipo de resultado se já existir
       if (data.sessionResource.status !== 'EM_PAUTA') {
@@ -602,9 +606,38 @@ export default function JulgarProcessoPage() {
       },
       cancel: {
         label: 'Cancelar',
-        onClick: () => {},
+        onClick: () => { },
       },
     });
+  };
+
+  const handleSpecificPresidentChange = async (presidentId: string) => {
+    setSpecificPresidentId(presidentId);
+
+    try {
+      // Salvar automaticamente no banco de dados
+      const response = await fetch(
+        `/api/ccr/session-resources/${params.resourceId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            specificPresidentId: presidentId || null,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        toast.success('Presidente substituto definido com sucesso');
+        fetchData(); // Recarregar dados
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Erro ao salvar presidente substituto');
+      }
+    } catch (error) {
+      console.error('Error saving specific president:', error);
+      toast.error('Erro ao salvar presidente substituto');
+    }
   };
 
   const handleUpdateStatus = async (newStatus: string) => {
@@ -620,6 +653,7 @@ export default function JulgarProcessoPage() {
             viewRequestedMemberId: newStatus === 'PEDIDO_VISTA' ? viewRequestedMemberId : null,
             diligenceDaysDeadline: newStatus === 'DILIGENCIA' ? parseInt(diligenceDays) : null,
             minutesText: minutesText || null,
+            specificPresidentId: specificPresidentId || null,
           }),
         }
       );
@@ -691,8 +725,19 @@ export default function JulgarProcessoPage() {
   // Função helper para remover pontos finais
   const removeFinalDot = (text: string) => text.trim().replace(/\.$/, '');
 
+  // Função helper para verificar se presidente da sessão é relator/revisor
+  const hasPresidentConflict = (): boolean => {
+    if (!data?.session.president) return false;
+
+    const presidentId = data.session.president.id;
+    const distributedToId = data.distribution?.distributedToId;
+    const reviewersIds = data.reviewers?.map(r => r.id) || [];
+
+    return presidentId === distributedToId || reviewersIds.includes(presidentId);
+  };
+
   // Função helper para gerar texto de votos declarados pendentes
-  const generatePendingVotesText = (includeMemberName: boolean = true) => {
+  const generatePendingVotesText = (includeMemberName: boolean = true, onlyCurrentSession: boolean = false) => {
     if (!sessionVotes || sessionVotes.length === 0) {
       return '';
     }
@@ -703,16 +748,28 @@ export default function JulgarProcessoPage() {
       return '';
     }
 
+    // Filtrar votações e votos pela sessão atual se necessário
+    const currentSessionId = data?.session.id;
+    let completedVotingsToCheck = data?.completedVotings || [];
+    let votesToConsider = sessionVotes;
+
+    if (onlyCurrentSession) {
+      completedVotingsToCheck = completedVotingsToCheck.filter(v =>
+        v.judgedInSession && v.judgedInSession.id === currentSessionId
+      );
+      votesToConsider = sessionVotes.filter(v => v.sessionId === currentSessionId);
+    }
+
     // Verificar quais tipos de votação já foram concluídos
-    const hasPreliminaryVoting = data?.completedVotings?.some(v =>
+    const hasPreliminaryVoting = completedVotingsToCheck.some(v =>
       v.votingType === 'NAO_CONHECIMENTO' && v.status === 'CONCLUIDA'
     );
-    const hasMeritVoting = data?.completedVotings?.some(v =>
+    const hasMeritVoting = completedVotingsToCheck.some(v =>
       v.votingType === 'MERITO' && v.status === 'CONCLUIDA'
     );
 
     // Buscar votos do membro distribuído excluindo os que já foram incluídos em votações concluídas
-    const distributedMemberVotes = sessionVotes.filter(v => {
+    const distributedMemberVotes = votesToConsider.filter(v => {
       if (v.member.id !== distributedMemberId) return false;
 
       // Se há votação preliminar concluída, excluir votos preliminares
@@ -784,29 +841,42 @@ export default function JulgarProcessoPage() {
     if (preliminarVotes.length > 0 && meritoVotes.length > 0) {
       const preliminarText = concatenateTexts(preliminarVotes);
       const meritoText = concatenateTexts(meritoVotes);
-      voteText = `${memberIdentification} declarou voto, em análise preliminar, no sentido de ${preliminarText}. Ainda, em análise de mérito, caso superada${preliminarVotes.length > 1 ? 's as referidas preliminares' : ' a referida preliminar'}, declarou voto no sentido de ${meritoText}`;
+      voteText = `${memberIdentification} declarou voto, em análise preliminar, no sentido de ${preliminarText}. Ainda, em análise de mérito, caso superada${preliminarVotes.length > 1 ? 's as referidas preliminares' : ' a referida preliminar'}, declarou voto no sentido de ${meritoText}.`;
     } else if (preliminarVotes.length > 0) {
       const preliminarText = concatenateTexts(preliminarVotes);
-      voteText = `${memberIdentification} declarou voto, em análise preliminar, no sentido de ${preliminarText}`;
+      voteText = `${memberIdentification} declarou voto, em análise preliminar, no sentido de ${preliminarText}.`;
     } else if (meritoVotes.length > 0) {
       const meritoText = concatenateTexts(meritoVotes);
-      voteText = `${memberIdentification} declarou voto, em análise de mérito, no sentido de ${meritoText}`;
+      voteText = `${memberIdentification} declarou voto, em análise de mérito, no sentido de ${meritoText}.`;
     }
 
     return voteText;
   };
 
   // Função helper para gerar detalhes das votações
-  const generateVotingDetails = () => {
+  const generateVotingDetails = (onlyCurrentSession: boolean = false) => {
     const hasCompletedVotings = data?.completedVotings && data.completedVotings.length > 0;
 
     if (!hasCompletedVotings) {
       return '';
     }
 
+    // Filtrar votações pela sessão atual se necessário
+    let completedVotings = data.completedVotings;
+    if (onlyCurrentSession) {
+      const currentSessionId = data?.session.id;
+      completedVotings = data.completedVotings.filter(v =>
+        v.judgedInSession && v.judgedInSession.id === currentSessionId
+      );
+
+      if (completedVotings.length === 0) {
+        return '';
+      }
+    }
+
     // Verificar caso especial: apenas 1 votação com apenas 1 voto (relator/revisor) de forma unânime
-    if (data.completedVotings.length === 1) {
-      const voting = data.completedVotings[0];
+    if (completedVotings.length === 1) {
+      const voting = completedVotings[0];
       const relatorRevisorVotes = voting.votes.filter(v => v.voteType === 'RELATOR' || v.voteType === 'REVISOR');
 
       if (relatorRevisorVotes.length === 1) {
@@ -841,9 +911,9 @@ export default function JulgarProcessoPage() {
 
     // Verificar se há votações de sessões diferentes
     const currentSessionId = data?.session.id;
-    const hasMultipleSessions = data.completedVotings.some(v => v.judgedInSession && v.judgedInSession.id !== currentSessionId);
+    const hasMultipleSessions = completedVotings.some(v => v.judgedInSession && v.judgedInSession.id !== currentSessionId);
 
-    data.completedVotings.forEach((voting, index) => {
+    completedVotings.forEach((voting, index) => {
       const isFirstVoting = index === 0;
       const votingTypeText = voting.votingType === 'NAO_CONHECIMENTO' ? 'em análise preliminar' : 'em análise de mérito';
       const conectivosVotacoes = ['Na sequência', 'Posteriormente', 'Após'];
@@ -865,10 +935,10 @@ export default function JulgarProcessoPage() {
           }
         } else {
           if (isCurrentSession) {
-            sessionIntroText = ', na presente sessão';
+            sessionIntroText = ` ${conectivoVotacao}, na presente sessão`;
           } else if (voting.judgedInSession) {
             const sessionDate = format(new Date(voting.judgedInSession.date), 'dd/MM/yyyy', { locale: ptBR });
-            sessionIntroText = `, na sessão de ${sessionDate}`;
+            sessionIntroText = ` ${conectivoVotacao}, na sessão de ${sessionDate}`;
           } else {
             sessionIntroText = `. ${conectivoVotacao}`;
           }
@@ -918,12 +988,14 @@ export default function JulgarProcessoPage() {
         votedVoteIds.add(relatorVote.id);
         const relatorGender = relatorVote.member.gender;
         const relatorPrefix = relatorGender === 'FEMININO' ? 'Dra.' : 'Dr.';
+        const relatorArticle = relatorGender === 'FEMININO' ? 'a membra relatora' : 'o membro relator';
+        const relatorArticleShort = relatorGender === 'FEMININO' ? 'a membra relatora' : 'o membro relator';
 
         if (isFirstVoting) {
-          narrativa += `${sessionIntroText}, o membro relator, ${relatorPrefix} ${relatorVote.member.name}, votou, ${votingTypeText}, no sentido de ${removeFinalDot(relatorVote.voteText.toLowerCase())}`;
+          narrativa += `${sessionIntroText}, ${relatorArticle}, ${relatorPrefix} ${relatorVote.member.name}, votou, ${votingTypeText}, no sentido de ${removeFinalDot(relatorVote.voteText.toLowerCase())}`;
         } else {
           const prefixText = hasMultipleSessions ? sessionIntroText : ` ${conectivoVotacao}`;
-          narrativa += `${prefixText}, o membro relator votou, ${votingTypeText}, no sentido de ${removeFinalDot(relatorVote.voteText.toLowerCase())}`;
+          narrativa += `${prefixText}, ${relatorArticleShort} votou, ${votingTypeText}, no sentido de ${removeFinalDot(relatorVote.voteText.toLowerCase())}`;
         }
 
         relatorFollowers = otherVotes.filter(v =>
@@ -949,9 +1021,10 @@ export default function JulgarProcessoPage() {
         votedVoteIds.add(revisorVote.id);
         const revisorGender = revisorVote.member.gender;
         const revisorPrefix = revisorGender === 'FEMININO' ? 'Dra.' : 'Dr.';
+        const revisorArticle = revisorGender === 'FEMININO' ? 'a membra revisora' : 'o membro revisor';
         const conectivos = ['De forma contrária', 'Em posição diversa', 'Por outro lado'];
         const conectivo = conectivos[revisorIndex % 3];
-        const introText = `. ${conectivo}, o membro revisor, ${revisorPrefix} ${revisorVote.member.name}, votou no sentido de ${removeFinalDot(revisorVote.voteText.toLowerCase())}`;
+        const introText = `. ${conectivo}, ${revisorArticle}, ${revisorPrefix} ${revisorVote.member.name}, votou no sentido de ${removeFinalDot(revisorVote.voteText.toLowerCase())}`;
         narrativa += introText;
 
         const revisorFollowers = otherVotes.filter(v =>
@@ -1127,7 +1200,12 @@ export default function JulgarProcessoPage() {
           const followedGender = followedMember.gender;
           const followedArticle = followedGender === 'FEMININO' ? 'da membra' : 'do membro';
 
-          narrativa += `. Com empate de votos, ${presidenteArticle} Presidente da sessão, ${presidentePrefix} ${presidenteVote.member.name}, declarou voto de minerva, acompanhando o voto ${followedArticle} ${followedMember.name}`;
+          // Usar presidente substituto se houver (quando presidente da sessão é relator/revisor)
+          const presidentText = data.sessionResource.specificPresident
+            ? `${presidenteArticle} Presidente substituto da sessão, ${presidentePrefix} ${presidenteVote.member.name},`
+            : `${presidenteArticle} Presidente da sessão, ${presidentePrefix} ${presidenteVote.member.name},`;
+
+          narrativa += `. Com empate de votos, ${presidentText} declarou voto de minerva, acompanhando o voto ${followedArticle} ${followedMember.name}`;
         }
       }
 
@@ -1153,12 +1231,16 @@ export default function JulgarProcessoPage() {
 
       if (voting.winningMember) {
         if (relatorVote && voting.winningMember.id === relatorVote.member.id) {
-          narrativa += `. ${conectivoConclusao}, ${resultText}, vence o voto do membro relator${isFirstVoting ? ' ' + relatorVote.member.name : ''}`;
+          const relatorGender = relatorVote.member.gender;
+          const relatorArticle = relatorGender === 'FEMININO' ? 'da membra relatora' : 'do membro relator';
+          narrativa += `. ${conectivoConclusao}, ${resultText}, vence o voto ${relatorArticle}${isFirstVoting ? ' ' + relatorVote.member.name : ''}`;
         } else {
           const winningRevisor = revisorVotes.find(rv => rv.member.id === voting.winningMember.id);
           if (winningRevisor) {
-            const revisorPrefix = winningRevisor.member.gender === 'FEMININO' ? 'Dra.' : 'Dr.';
-            narrativa += `. ${conectivoConclusao}, ${resultText}, vence o voto do membro revisor ${revisorPrefix} ${winningRevisor.member.name}`;
+            const revisorGender = winningRevisor.member.gender;
+            const revisorPrefix = revisorGender === 'FEMININO' ? 'Dra.' : 'Dr.';
+            const revisorArticle = revisorGender === 'FEMININO' ? 'da membra revisora' : 'do membro revisor';
+            narrativa += `. ${conectivoConclusao}, ${resultText}, vence o voto ${revisorArticle} ${revisorPrefix} ${winningRevisor.member.name}`;
           }
         }
       }
@@ -1190,11 +1272,11 @@ export default function JulgarProcessoPage() {
       const dias = parseInt(diligenceDays);
       const diasExtenso = numberToWords(dias);
 
-      // Gerar detalhes das votações concluídas
-      const completedVotingsText = generateVotingDetails();
+      // Gerar detalhes das votações concluídas (apenas da sessão atual)
+      const completedVotingsText = generateVotingDetails(true);
 
-      // Gerar texto de votos declarados pendentes (sem nome se há votações concluídas)
-      const pendingVotesText = generatePendingVotesText(completedVotingsText.length === 0);
+      // Gerar texto de votos declarados pendentes (sem nome se há votações concluídas, apenas da sessão atual)
+      const pendingVotesText = generatePendingVotesText(completedVotingsText.length === 0, true);
 
       // Combinar ambos os textos
       let voteDetails = '';
@@ -1319,11 +1401,11 @@ export default function JulgarProcessoPage() {
       setMinutesText(generatedText);
       toast.success('Texto gerado com sucesso');
     } else if (selectedResult === 'SUSPENSO') {
-      // Gerar detalhes das votações concluídas
-      const completedVotingsText = generateVotingDetails();
+      // Gerar detalhes das votações concluídas (apenas da sessão atual)
+      const completedVotingsText = generateVotingDetails(true);
 
-      // Gerar texto de votos declarados pendentes (sem nome se há votações concluídas)
-      const pendingVotesText = generatePendingVotesText(completedVotingsText.length === 0);
+      // Gerar texto de votos declarados pendentes (sem nome se há votações concluídas, apenas da sessão atual)
+      const pendingVotesText = generatePendingVotesText(completedVotingsText.length === 0, true);
 
       // Combinar ambos os textos
       let voteDetails = '';
@@ -1471,11 +1553,11 @@ export default function JulgarProcessoPage() {
       // Determinar prefixo Dr./Dra.
       const prefix = gender === 'FEMININO' ? 'Dra.' : 'Dr.';
 
-      // Gerar detalhes das votações concluídas
-      const completedVotingsText = generateVotingDetails();
+      // Gerar detalhes das votações concluídas (apenas da sessão atual)
+      const completedVotingsText = generateVotingDetails(true);
 
-      // Gerar texto de votos declarados pendentes (sem nome se há votações concluídas)
-      const pendingVotesText = generatePendingVotesText(completedVotingsText.length === 0);
+      // Gerar texto de votos declarados pendentes (sem nome se há votações concluídas, apenas da sessão atual)
+      const pendingVotesText = generatePendingVotesText(completedVotingsText.length === 0, true);
 
       // Combinar ambos os textos
       let voteDetails = '';
@@ -2015,11 +2097,19 @@ export default function JulgarProcessoPage() {
                 </CardDescription>
               </div>
               {data.session.status !== 'CONCLUIDA' && (
-                <Button asChild className="cursor-pointer">
-                  <Link href={`/ccr/sessoes/${params.id}/processos/${params.resourceId}/julgar/novo-voto`}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Novo Voto
-                  </Link>
+                <Button
+                  className="cursor-pointer"
+                  onClick={() => {
+                    // Validar presidente substituto antes de navegar
+                    if (hasPresidentConflict() && !specificPresidentId) {
+                      toast.error('Selecione um presidente substituto antes de registrar votos. O presidente da sessão é relator/revisor neste processo.');
+                      return;
+                    }
+                    router.push(`/ccr/sessoes/${params.id}/processos/${params.resourceId}/julgar/novo-voto`);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Voto
                 </Button>
               )}
             </div>
@@ -2048,6 +2138,10 @@ export default function JulgarProcessoPage() {
                         totalDistributedMembers={data.distributedMemberIds.length}
                         totalAbsentMembers={data.sessionResource.absences.length}
                         isSessionCompleted={data.session.status === 'CONCLUIDA'}
+                        presidentId={data.session.president?.id}
+                        distributedToId={data.distribution?.distributedToId}
+                        reviewersIds={data.reviewers.map(r => r.id)}
+                        specificPresidentId={specificPresidentId}
                         onDelete={fetchData}
                         onVotingChange={resetResultIfExists}
                       />
@@ -2227,6 +2321,68 @@ export default function JulgarProcessoPage() {
           </CardContent>
         </Card>
 
+        {/* Card de Presidente Substituto (quando há conflito de interesse) */}
+        {hasPresidentConflict() && (
+          <Card>
+            <CardHeader>
+              <div className="space-y-1.5">
+                <CardTitle>
+                  Presidente Substituto {data.session.status !== 'CONCLUIDA' && <span className="text-red-500">*</span>}
+                </CardTitle>
+                <CardDescription>
+                  {(() => {
+                    if (!data.session.president) return null;
+
+                    const presidentId = data.session.president.id;
+                    const presidentName = data.session.president.name;
+                    const presidentGender = data.session.president.gender;
+                    const distributedToId = data.distribution?.distributedToId;
+                    const reviewersIds = data.reviewers?.map(r => r.id) || [];
+
+                    // Determinar artigo e função
+                    const article = presidentGender === 'FEMININO' ? 'A' : 'O';
+                    const presidentTitle = presidentGender === 'FEMININO' ? 'presidente' : 'presidente';
+
+                    let role = '';
+                    if (presidentId === distributedToId) {
+                      role = presidentGender === 'FEMININO' ? 'relatora' : 'relator';
+                    } else if (reviewersIds.includes(presidentId)) {
+                      role = presidentGender === 'FEMININO' ? 'revisora' : 'revisor';
+                    }
+
+                    return `${article} ${presidentTitle} da sessão (${presidentName}) é ${role} neste processo. Selecione um presidente substituto para este julgamento específico.`;
+                  })()}
+                </CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="w-full">
+
+                <Select
+                  value={specificPresidentId}
+                  onValueChange={data.session.status !== 'CONCLUIDA' ? handleSpecificPresidentChange : undefined}
+                >
+                  <SelectTrigger className={cn(
+                    "h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors",
+                    data.session.status === 'CONCLUIDA' && "pointer-events-none"
+                  )}>
+                    <SelectValue placeholder="Selecione um presidente substituto..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-lg">
+                    {data.session.members
+                      .filter(sm => sm.member.id !== data.session.president?.id)
+                      .map((sm) => (
+                        <SelectItem key={sm.member.id} value={sm.member.id}>
+                          {sm.member.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Card de Status e Ações */}
         <Card>
           <CardHeader>
@@ -2291,34 +2447,34 @@ export default function JulgarProcessoPage() {
         {/* Botões de Navegação - apenas quando sessão não está concluída */}
         {data.session.status !== 'CONCLUIDA' && (
           <div className="flex justify-end gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setSelectedResult(null)}
-            disabled={saving}
-            className="cursor-pointer"
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            onClick={() => {
-              if (!selectedResult) {
-                toast.error('Selecione o tipo de resultado');
-                return;
-              }
-              if (!minutesText || minutesText.trim() === '') {
-                toast.error('O texto da ata é obrigatório');
-                return;
-              }
-              validateAndConfirmStatus(selectedResult);
-            }}
-            disabled={saving}
-            className="cursor-pointer"
-          >
-            Salvar Resultado
-          </Button>
-        </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSelectedResult(null)}
+              disabled={saving}
+              className="cursor-pointer"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (!selectedResult) {
+                  toast.error('Selecione o tipo de resultado');
+                  return;
+                }
+                if (!minutesText || minutesText.trim() === '') {
+                  toast.error('O texto da ata é obrigatório');
+                  return;
+                }
+                validateAndConfirmStatus(selectedResult);
+              }}
+              disabled={saving}
+              className="cursor-pointer"
+            >
+              Salvar Resultado
+            </Button>
+          </div>
         )}
       </div>
     </CCRPageWrapper>

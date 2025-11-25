@@ -11,6 +11,11 @@ import { SessionVoteForm } from './components/session-vote-form';
 interface JudgmentData {
   sessionResource: {
     id: string;
+    specificPresident: {
+      id: string;
+      name: string;
+      role: string;
+    } | null;
     resource: {
       processNumber: string;
       resourceNumber: string;
@@ -20,6 +25,11 @@ interface JudgmentData {
     id: string;
     sessionNumber: string;
     status: string;
+    president: {
+      id: string;
+      name: string;
+      role: string;
+    } | null;
     members: Array<{
       member: {
         id: string;
@@ -202,7 +212,34 @@ export default function NovoVotoPage() {
           <SessionVoteForm
             sessionId={params.id as string}
             resourceId={params.resourceId as string}
-            members={data.session.members.map(m => m.member)}
+            members={(() => {
+              let sessionMembers = data.session.members.map(m => m.member);
+
+              // Remover presidente substituto da lista (ele só vota como presidente, não como votante)
+              const specificPresidentId = data.sessionResource.specificPresident?.id;
+              if (specificPresidentId) {
+                sessionMembers = sessionMembers.filter(m => m.id !== specificPresidentId);
+              }
+
+              // Adicionar presidente se ele não estiver na lista e for relator/revisor
+              if (data.session.president) {
+                const presidentId = data.session.president.id;
+                const distributedToId = data.distribution?.distributedToId;
+                const reviewersIds = data.reviewers.map(r => r.id);
+
+                // Verificar se presidente é relator ou revisor
+                const isPresidentInProcess = presidentId === distributedToId || reviewersIds.includes(presidentId);
+
+                // Verificar se já está na lista
+                const presidentExists = sessionMembers.some(m => m.id === presidentId);
+
+                if (isPresidentInProcess && !presidentExists) {
+                  sessionMembers.push(data.session.president);
+                }
+              }
+
+              return sessionMembers;
+            })()}
             distributedToId={data.distribution?.distributedToId}
             relatorId={data.distribution?.firstDistribution?.id}
             reviewersIds={data.reviewers.map(r => r.id)}

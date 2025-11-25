@@ -78,7 +78,20 @@ export default function RecursoDetalhesPage() {
       const response = await fetch(`/api/ccr/resources/${params.id}/sessions`);
       if (response.ok) {
         const data = await response.json();
-        setSessions(data);
+
+        // Ordenar por data da sessão (mais antiga primeiro) e renumerar
+        const sortedData = data
+          .sort((a: any, b: any) => {
+            const dateA = new Date(a.session.date).getTime();
+            const dateB = new Date(b.session.date).getTime();
+            return dateA - dateB;
+          })
+          .map((item: any, index: number) => ({
+            ...item,
+            order: index + 1
+          }));
+
+        setSessions(sortedData);
       }
     } catch (error) {
       console.error('Error fetching sessions:', error);

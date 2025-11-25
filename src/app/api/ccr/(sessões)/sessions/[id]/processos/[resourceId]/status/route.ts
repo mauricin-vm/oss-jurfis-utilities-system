@@ -28,6 +28,7 @@ export async function PATCH(
       viewRequestedMemberId,
       diligenceDaysDeadline,
       minutesText,
+      specificPresidentId,
     } = body;
 
     // Validar status
@@ -117,6 +118,11 @@ export async function PATCH(
       status,
       minutesText: minutesText || null,
     };
+
+    // Só atualizar specificPresidentId se foi explicitamente fornecido
+    if (specificPresidentId !== undefined) {
+      updateData.specificPresidentId = specificPresidentId || null;
+    }
 
     // Campos específicos por status
     if (status === 'PEDIDO_VISTA') {

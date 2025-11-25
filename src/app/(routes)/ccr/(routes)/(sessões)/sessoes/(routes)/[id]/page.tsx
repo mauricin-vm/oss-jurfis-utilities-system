@@ -376,7 +376,9 @@ function SortableResourceCard({
                   </span>
                   <span className="text-muted-foreground">
                     {distribution.reviewersIds.map((reviewerId, idx) => {
-                      const reviewer = session.members.find(m => m.member.id === reviewerId)?.member;
+                      // Buscar revisor em session.members ou verificar se é o presidente
+                      const reviewer = session.members.find(m => m.member.id === reviewerId)?.member
+                        || (session.president?.id === reviewerId ? session.president : null);
                       return reviewer ? (
                         <span key={reviewerId}>
                           {reviewer.name}
@@ -391,7 +393,12 @@ function SortableResourceCard({
                 <div>
                   <span className="font-medium">Distribuição: </span>
                   <span className="text-muted-foreground">
-                    {session.members.find(m => m.member.id === distribution.distributedToId)?.member.name || '-'}
+                    {(() => {
+                      // Buscar membro distribuído em session.members ou verificar se é o presidente
+                      const distributedMember = session.members.find(m => m.member.id === distribution.distributedToId)?.member
+                        || (session.president?.id === distribution.distributedToId ? session.president : null);
+                      return distributedMember?.name || '-';
+                    })()}
                   </span>
                 </div>
               )}

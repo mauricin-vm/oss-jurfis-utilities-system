@@ -243,6 +243,77 @@ export async function PUT(
   }
 }
 
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    const { id } = await params;
+    const body = await req.json();
+
+    // Verificar se o sessionResource existe
+    const existingSessionResource = await prismadb.sessionResource.findUnique({
+      where: { id },
+    });
+
+    if (!existingSessionResource) {
+      return new NextResponse('Recurso de sessão não encontrado', { status: 404 });
+    }
+
+    // Verificar se o presidente específico existe (se fornecido)
+    if (body.specificPresidentId) {
+      const specificPresident = await prismadb.member.findUnique({
+        where: { id: body.specificPresidentId },
+      });
+
+      if (!specificPresident) {
+        return new NextResponse('Presidente específico não encontrado', { status: 404 });
+      }
+    }
+
+    // Atualizar apenas os campos fornecidos
+    const sessionResource = await prismadb.sessionResource.update({
+      where: { id },
+      data: body,
+      include: {
+        session: {
+          select: {
+            id: true,
+            sessionNumber: true,
+            date: true,
+            type: true,
+            status: true,
+          },
+        },
+        resource: {
+          include: {
+            protocol: true,
+          },
+        },
+        specificPresident: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            gender: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(sessionResource);
+  } catch (error) {
+    console.log('[SESSION_RESOURCE_PATCH]', error);
+    return new NextResponse('Internal error', { status: 500 });
+  }
+}
+
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }

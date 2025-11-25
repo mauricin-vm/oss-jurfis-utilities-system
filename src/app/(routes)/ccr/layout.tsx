@@ -82,7 +82,7 @@ export default function CCRLayout({ children }: { children: React.ReactNode }) {
           defaultOpen: false,
           subItems: [
             { label: 'Consultar Sessões', href: '/ccr/sessoes' },
-            { label: 'Atas', href: '/ccr/sessoes/atas' },
+            { label: 'Atas', href: '/ccr/atas' },
             { label: 'Acórdãos', href: '/ccr/sessoes/acordaos' },
           ],
         },
@@ -166,6 +166,14 @@ export default function CCRLayout({ children }: { children: React.ReactNode }) {
           label: 'Nova Sessão',
           icon: Plus,
           onClick: () => router.push('/ccr/sessoes/novo'),
+        });
+      }
+      // Se estiver na página de atas, adicionar botão "Nova Ata"
+      else if (pathname?.startsWith('/ccr/atas')) {
+        customActions.push({
+          label: 'Nova Ata',
+          icon: Plus,
+          onClick: () => router.push('/ccr/atas/novo'),
         });
       }
       // Se estiver na página de partes de um recurso

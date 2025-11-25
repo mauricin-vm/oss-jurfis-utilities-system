@@ -98,6 +98,14 @@ export async function GET(
             role: true,
           },
         },
+        specificPresident: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            gender: true,
+          },
+        },
       },
     });
 
@@ -116,6 +124,14 @@ export async function GET(
         sessionNumber: true,
         date: true,
         status: true,
+        president: {
+          select: {
+            id: true,
+            name: true,
+            role: true,
+            gender: true,
+          },
+        },
         members: {
           include: {
             member: {

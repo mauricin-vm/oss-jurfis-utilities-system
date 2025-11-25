@@ -78,15 +78,35 @@ interface VotingCardProps {
   totalDistributedMembers: number;
   totalAbsentMembers: number;
   isSessionCompleted?: boolean;
+  presidentId?: string | null;
+  distributedToId?: string;
+  reviewersIds?: string[];
+  specificPresidentId?: string;
   onDelete?: () => void;
   onVotingChange?: () => Promise<void>;
 }
 
-export function VotingCard({ voting, sessionId, resourceId, index, totalMembers, totalDistributedMembers, totalAbsentMembers, isSessionCompleted = false, onDelete, onVotingChange }: VotingCardProps) {
+export function VotingCard({ voting, sessionId, resourceId, index, totalMembers, totalDistributedMembers, totalAbsentMembers, isSessionCompleted = false, presidentId, distributedToId, reviewersIds = [], specificPresidentId, onDelete, onVotingChange }: VotingCardProps) {
   const router = useRouter();
   const [actionLoading, setActionLoading] = useState(false);
   const [hoveredVoteId, setHoveredVoteId] = useState<string | null>(null);
   const [deletingVoteId, setDeletingVoteId] = useState<string | null>(null);
+
+  // Função para verificar se presidente substituto é necessário
+  const validatePresidentSubstitute = (): boolean => {
+    if (!presidentId) return true; // Se não há presidente, não precisa validar
+
+    // Verificar se presidente é relator ou revisor
+    const isPresidentInProcess = presidentId === distributedToId || reviewersIds.includes(presidentId);
+
+    // Se presidente está no processo e não há substituto definido
+    if (isPresidentInProcess && !specificPresidentId) {
+      toast.error('Selecione um presidente substituto antes de continuar. O presidente da sessão é relator/revisor neste processo.');
+      return false;
+    }
+
+    return true;
+  };
 
   const {
     attributes,
@@ -144,6 +164,11 @@ export function VotingCard({ voting, sessionId, resourceId, index, totalMembers,
   };
 
   const handleDeclareUnanimous = async () => {
+    // Validar presidente substituto antes de prosseguir
+    if (!validatePresidentSubstitute()) {
+      return;
+    }
+
     toast.warning('Declarar esta votação como unânime? Todos os membros seguirão este voto.', {
       duration: 10000,
       className: 'min-w-[400px]',
@@ -331,7 +356,13 @@ export function VotingCard({ voting, sessionId, resourceId, index, totalMembers,
             variant="outline"
             size="sm"
             className="cursor-pointer h-9"
-            onClick={() => router.push(`/ccr/sessoes/${sessionId}/processos/${resourceId}/julgar/votacoes/${voting.id}`)}
+            onClick={() => {
+              // Validar presidente substituto antes de navegar
+              if (!validatePresidentSubstitute()) {
+                return;
+              }
+              router.push(`/ccr/sessoes/${sessionId}/processos/${resourceId}/julgar/votacoes/${voting.id}`);
+            }}
           >
             <Eye className="h-4 w-4 mr-2" />
             Detalhes

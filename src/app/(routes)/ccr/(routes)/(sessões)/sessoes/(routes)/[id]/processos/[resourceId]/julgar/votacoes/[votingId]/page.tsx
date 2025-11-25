@@ -105,6 +105,7 @@ interface SessionData {
   status: string;
   members: SessionMember[];
   president: Member | null;
+  specificPresident?: Member | null;
 }
 
 interface MemberVote {
@@ -193,6 +194,14 @@ export default function VotingDetailsPage() {
 
       if (sessionResponse.ok) {
         const sessionData = await sessionResponse.json();
+
+        // Buscar presidente substituto do SessionResource
+        const resourceResponse = await fetch(`/api/ccr/session-resources/${params.resourceId}`);
+        if (resourceResponse.ok) {
+          const resourceData = await resourceResponse.json();
+          sessionData.specificPresident = resourceData.specificPresident || null;
+        }
+
         setSession(sessionData);
       }
 
@@ -220,16 +229,16 @@ export default function VotingDetailsPage() {
 
       // Processar cada membro disponível (incluindo presidente se houver voto de minerva)
       const membersToProcess = [...availableMembers];
-      if (shouldShowPresidentVote && session?.president) {
+      if (shouldShowPresidentVote && effectivePresident) {
         membersToProcess.push({
           id: 'president',
-          member: session.president
+          member: effectivePresident
         } as any);
       }
 
       // Se o presidente NÃO deve votar mais, mas tem voto no banco, deletar
-      if (!shouldShowPresidentVote && session?.president) {
-        const presidentVote = voting?.votes.find(v => v.member.id === session.president.id);
+      if (!shouldShowPresidentVote && effectivePresident) {
+        const presidentVote = voting?.votes.find(v => v.member.id === effectivePresident.id);
         if (presidentVote) {
           const deleteResponse = await fetch(
             `/api/ccr/sessions/${params.id}/processos/${params.resourceId}/votes/${presidentVote.id}`,
@@ -335,7 +344,7 @@ export default function VotingDetailsPage() {
         // Todos os outros campos (meritDecisionId, officialDecisionId, voteText) permanecem null
 
         // Determinar voteType: presidente usa PRESIDENTE, outros usam o parâmetro
-        const finalVoteType = (memberId === session?.president?.id) ? 'PRESIDENTE' : voteType;
+        const finalVoteType = (memberId === effectivePresidentId) ? 'PRESIDENTE' : voteType;
 
         const response = await fetch(
           `/api/ccr/sessions/${params.id}/processos/${params.resourceId}/votes`,
@@ -417,18 +426,21 @@ export default function VotingDetailsPage() {
   const isSessionCompleted = session?.status === 'CONCLUIDA';
   const isReadOnly = isCompletedFromOtherSession || isSessionCompleted;
 
+  // Determinar qual presidente usar (substituto se houver, senão o normal)
+  const effectivePresident = session?.specificPresident || session?.president;
+  const effectivePresidentId = effectivePresident?.id;
+
   // Membros disponíveis
   const allMembers = (() => {
     // Se é votação concluída de outra sessão, mostrar apenas membros que TEM voto registrado
     if (isCompletedFromOtherSession) {
-      const presidentId = session?.president?.id;
       const membersWithVotes = voting?.votes
         .filter(v => {
           // Excluir votos de relator e revisor
           if (v.voteType === 'RELATOR' || v.voteType === 'REVISOR') return false;
 
-          // Excluir presidente (ele será mostrado separadamente no voto de minerva)
-          if (presidentId && v.member.id === presidentId) return false;
+          // Excluir presidente efetivo (ele será mostrado separadamente no voto de minerva)
+          if (effectivePresidentId && v.member.id === effectivePresidentId) return false;
 
           return true;
         })
@@ -439,9 +451,11 @@ export default function VotingDetailsPage() {
       return membersWithVotes;
     }
 
-    // Caso contrário, TODOS exceto RELATOR, REVISOR e AUSENTES
+    // Caso contrário, TODOS exceto RELATOR, REVISOR, AUSENTES e PRESIDENTE EFETIVO
     return session?.members.filter(
-      (m) => !relatorRevisorMemberIds.includes(m.member.id) && !absentMemberIds.includes(m.member.id)
+      (m) => !relatorRevisorMemberIds.includes(m.member.id) &&
+             !absentMemberIds.includes(m.member.id) &&
+             m.member.id !== effectivePresidentId
     ) || [];
   })();
 
@@ -546,19 +560,19 @@ export default function VotingDetailsPage() {
   })();
 
   // Verificar se o presidente já está na lista de disponíveis
-  const presidentAlreadyVoting = session?.president &&
-    availableMembers.some(m => m.member.id === session.president?.id);
+  const presidentAlreadyVoting = effectivePresident &&
+    availableMembers.some(m => m.member.id === effectivePresidentId);
 
   const showPresidentQualityVote = needsQualityVote &&
-    session?.president &&
+    effectivePresident &&
     !presidentAlreadyVoting &&
-    !votedMemberIds.includes(session.president.id);
+    !votedMemberIds.includes(effectivePresidentId!);
 
   // Detectar empate inicial (apenas votos do banco, sem considerar interações)
   const initialTieStatus = useMemo(() => {
-    if (!session?.president || !voting) return false;
+    if (!effectivePresident || !voting) return false;
 
-    const presidentId = session.president.id;
+    const presidentId = effectivePresidentId!;
     const allVotes = voting.votes || [];
 
     // Verificar se todos os conselheiros (exceto presidente) votaram
@@ -595,13 +609,13 @@ export default function VotingDetailsPage() {
     const tiedVotes = voteCounts.filter(count => count === maxVotes);
 
     return tiedVotes.length > 1;
-  }, [session?.president, voting, availableMembers]);
+  }, [effectivePresident, voting, availableMembers]);
 
   // Detectar empate dinâmico (considera apenas memberVotes após carregamento)
   const currentTieStatus = useMemo(() => {
-    if (!session?.president) return false;
+    if (!effectivePresident) return false;
 
-    const presidentId = session.president.id;
+    const presidentId = effectivePresidentId!;
 
     // Verificar se TODOS os conselheiros têm voto em memberVotes
     const allCouncilorsHaveVote = availableMembers.every(sessionMember => {
@@ -641,13 +655,13 @@ export default function VotingDetailsPage() {
     const tiedVotes = voteCounts.filter(count => count === maxVotes);
 
     return tiedVotes.length > 1;
-  }, [memberVotes, session?.president, availableMembers]);
+  }, [memberVotes, effectivePresident, availableMembers]);
 
   // Verificar se todos os conselheiros votaram (considera apenas memberVotes)
   const allCouncilorsVoted = useMemo(() => {
-    if (!session?.president) return false;
+    if (!effectivePresident) return false;
 
-    const presidentId = session.president.id;
+    const presidentId = effectivePresidentId!;
 
     return availableMembers.every(sessionMember => {
       const memberId = sessionMember.member.id;
@@ -657,7 +671,7 @@ export default function VotingDetailsPage() {
       // (considera AUSENTE, IMPEDIDO, ABSTENCAO, SUSPEITO e votos válidos)
       return memberVotes[memberId] !== undefined && memberVotes[memberId] !== '';
     });
-  }, [session?.president, availableMembers, memberVotes]);
+  }, [effectivePresident, availableMembers, memberVotes]);
 
   // Mostrar linha do presidente baseado no estado atual
   // CARREGAMENTO INICIAL (sem interação):
@@ -666,25 +680,25 @@ export default function VotingDetailsPage() {
   //   - Mostrar apenas se há empate atual entre conselheiros
   // IMPORTANTE: Só mostra se TODOS os conselheiros votaram
   const shouldShowPresidentVote = useMemo(() => {
-    if (!session?.president || presidentAlreadyVoting) return false;
+    if (!effectivePresident || presidentAlreadyVoting) return false;
 
     // SEMPRE requer que todos os conselheiros tenham votado
     if (!allCouncilorsVoted) return false;
 
     if (!hasUserInteracted) {
       // Carregamento inicial: mostrar se presidente votou OU há empate inicial
-      const presidentHasVoteInDB = votedMemberIds.includes(session.president.id);
+      const presidentHasVoteInDB = votedMemberIds.includes(effectivePresidentId!);
       return presidentHasVoteInDB || initialTieStatus;
     } else {
       // Após interação: baseado apenas no empate atual
       return currentTieStatus;
     }
-  }, [session?.president, presidentAlreadyVoting, allCouncilorsVoted, hasUserInteracted, votedMemberIds, initialTieStatus, currentTieStatus]);
+  }, [effectivePresident, presidentAlreadyVoting, allCouncilorsVoted, hasUserInteracted, votedMemberIds, initialTieStatus, currentTieStatus]);
 
   // Limpar voto do presidente quando linha DESAPARECE (desempate)
   useEffect(() => {
-    if (hasUserInteracted && session?.president) {
-      const presidentId = session.president.id;
+    if (hasUserInteracted && effectivePresident) {
+      const presidentId = effectivePresidentId!;
 
       // Detectar mudança de true para false (linha desapareceu por desempate)
       if (!shouldShowPresidentVote && prevShowPresidentVote.current) {
@@ -702,13 +716,13 @@ export default function VotingDetailsPage() {
       // Atualizar valor anterior
       prevShowPresidentVote.current = shouldShowPresidentVote;
     }
-  }, [shouldShowPresidentVote, hasUserInteracted, session?.president, memberVotes]);
+  }, [shouldShowPresidentVote, hasUserInteracted, effectivePresident, memberVotes]);
 
   // Calcular se há vencedor e quem é
   const winnerInfo = useMemo(() => {
     if (!allCouncilorsVoted || !voting) return null;
 
-    const presidentId = session?.president?.id;
+    const presidentId = effectivePresidentId;
     const validMemberIds = new Set(availableMembers.map(m => m.member.id));
     if (shouldShowPresidentVote && presidentId) {
       validMemberIds.add(presidentId);
@@ -735,7 +749,7 @@ export default function VotingDetailsPage() {
     }
 
     return null;
-  }, [allCouncilorsVoted, voting, session?.president, availableMembers, shouldShowPresidentVote, memberVotes, registeredVotes]);
+  }, [allCouncilorsVoted, voting, effectivePresident, availableMembers, shouldShowPresidentVote, memberVotes, registeredVotes]);
 
   const breadcrumbs = [
     { label: 'Menu', href: '/' },
@@ -1268,7 +1282,7 @@ export default function VotingDetailsPage() {
               })}
 
               {/* Linha do Presidente - Voto de Qualidade */}
-              {shouldShowPresidentVote && session?.president && (
+              {shouldShowPresidentVote && effectivePresident && (
                 <>
                   {/* Linha de separação antes do presidente */}
                   <div className="grid grid-cols-[250px_1fr] bg-gray-100 border-y">
@@ -1281,9 +1295,12 @@ export default function VotingDetailsPage() {
                   {/* Linha do presidente */}
                   <div className="grid grid-cols-[250px_1fr] border-b last:border-b-0">
                     <div className="p-4 border-r bg-gray-50">
-                      <p className="text-sm font-medium">{session.president.name}</p>
+                      <p className="text-sm font-medium">{effectivePresident.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {session.president.role}
+                        {effectivePresident.role}
+                        {session?.specificPresident && (
+                          <span className="ml-1 text-xs text-blue-600 font-medium">(Substituto)</span>
+                        )}
                       </p>
                     </div>
                     <div className="grid gap-px" style={{ gridTemplateColumns: `repeat(${registeredVotes.length}, 1fr) repeat(3, 70px)` }}>
@@ -1296,8 +1313,8 @@ export default function VotingDetailsPage() {
                             setHasUserInteracted(true);
                             setMemberVotes((prev) => ({
                               ...prev,
-                              [session.president!.id]:
-                                prev[session.president!.id] === vote.id ? '' : vote.id,
+                              [effectivePresident!.id]:
+                                prev[effectivePresident!.id] === vote.id ? '' : vote.id,
                             }));
                           }}
                           className={cn(
@@ -1305,7 +1322,7 @@ export default function VotingDetailsPage() {
                             isReadOnly
                               ? ""
                               : "cursor-pointer hover:bg-gray-100",
-                            memberVotes[session.president.id] === vote.id && getCellBackgroundColor(vote)
+                            memberVotes[effectivePresident.id] === vote.id && getCellBackgroundColor(vote)
                           )}
                         >
                           <div className="w-full h-full" />
@@ -1338,8 +1355,8 @@ export default function VotingDetailsPage() {
                     // 1. Todos em availableMembers
                     // 2. Presidente, se shouldShowPresidentVote for verdadeiro
                     const validMemberIds = new Set(availableMembers.map(m => m.member.id));
-                    if (shouldShowPresidentVote && session?.president) {
-                      validMemberIds.add(session.president.id);
+                    if (shouldShowPresidentVote && effectivePresident) {
+                      validMemberIds.add(effectivePresident.id);
                     }
 
                     // Calcular totais apenas para membros válidos
@@ -1377,8 +1394,8 @@ export default function VotingDetailsPage() {
                   {['IMPEDIDO', 'ABSTENCAO', 'SUSPEITO'].map((status, index) => {
                     // Contar apenas para membros válidos
                     const validMemberIds = new Set(availableMembers.map(m => m.member.id));
-                    if (shouldShowPresidentVote && session?.president) {
-                      validMemberIds.add(session.president.id);
+                    if (shouldShowPresidentVote && effectivePresident) {
+                      validMemberIds.add(effectivePresident.id);
                     }
                     const total = Object.entries(memberVotes)
                       .filter(([memberId, choice]) => validMemberIds.has(memberId) && choice === status)
