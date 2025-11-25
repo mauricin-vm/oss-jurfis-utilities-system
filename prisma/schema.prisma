@@ -312,10 +312,11 @@ model Resource {
   publications   Publication[]
   history        ResourceHistory[]
   notifications  Notification[]
-  sessionResults SessionResult[]   @relation("ResourceSessionResults") // Resultados de votações do processo
+  sessionResults SessionResult[]       @relation("ResourceSessionResults") // Resultados de votações do processo
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  distributionRecords SessionDistributionRecord[] @relation("ResourceDistributionRecords")
 
   @@index([year, sequenceNumber])
   @@index([decisionYear, decisionSequenceNumber])
@@ -582,18 +583,23 @@ model Session {
   observations          String? @db.Text
   administrativeMatters String? @db.Text
 
-  resources      SessionResource[]
-  members        SessionMember[] // Membros presentes na sessão
-  distributions  SessionDistribution[] @relation("DistributionsSessions")
-  minutes        SessionMinutes? // Ata da sessão (gerada após a sessão)
-  publications   Publication[] // Publicações da pauta (type=SESSAO) e outros documentos
-  sessionVotes   SessionVote[]         @relation("VotesInSession") // Votos individuais
-  resultsJudged  SessionResult[]       @relation("SessionResultsJudged") // Resultados julgados nesta sessão
+  resources     SessionResource[]
+  members       SessionMember[] // Membros presentes na sessão
+  distributions SessionDistribution[] @relation("DistributionsSessions")
+  minutes       SessionMinutes? // Ata da sessão (gerada após a sessão)
+  publications  Publication[] // Publicações da pauta (type=SESSAO) e outros documentos
+  sessionVotes  SessionVote[]         @relation("VotesInSession") // Votos individuais
+  resultsJudged SessionResult[]       @relation("SessionResultsJudged") // Resultados julgados nesta sessão
 
   createdBy     String
   createdByUser User     @relation("SessionCreatedBy", fields: [createdBy], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  // Distribuições feitas nesta sessão (para análise futura)
+  distributionRecordsMade   SessionDistributionRecord[] @relation("DistributionRecordsMade")
+  // Distribuições que serão analisadas nesta sessão
+  distributionRecordsTarget SessionDistributionRecord[] @relation("DistributionRecordsTarget")
 
   @@index([date])
   @@index([status])
@@ -665,6 +671,39 @@ model SessionResourceAbsence {
   @@schema("jurfis")
 }
 
+model SessionDistributionRecord {
+  // Tabela para registrar distribuições de processos para análise em sessões futuras
+  // Ex: "Distribuído na sessão de 01/10/2025 para julgar em 30/10/2025"
+  id String @id @default(uuid())
+
+  // Recurso/Processo que foi distribuído
+  resourceId String
+  resource   Resource @relation("ResourceDistributionRecords", fields: [resourceId], references: [id], onDelete: Cascade)
+
+  // Para quem foi distribuído (conselheiro)
+  distributedToId String
+  distributedTo   Member @relation("MemberDistributionRecords", fields: [distributedToId], references: [id])
+
+  // Sessão onde foi feita a distribuição (sessão atual)
+  distributionSessionId String
+  distributionSession   Session @relation("DistributionRecordsMade", fields: [distributionSessionId], references: [id])
+
+  // Sessão onde será analisado/julgado (sessão futura) - opcional
+  targetSessionId String?
+  targetSession   Session? @relation("DistributionRecordsTarget", fields: [targetSessionId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([resourceId, distributionSessionId])
+  @@index([resourceId])
+  @@index([distributedToId])
+  @@index([distributionSessionId])
+  @@index([targetSessionId])
+  @@map("CCR_SessionDistributionRecord")
+  @@schema("jurfis")
+}
+
 model SessionResource {
   //tabela de recursos incluídos na sessão
   id         String   @id @default(uuid())
@@ -694,7 +733,7 @@ model SessionResource {
   viewRequestedBy   Member? @relation("SessionResourceViewRequests", fields: [viewRequestedById], references: [id])
 
   // Relacionamentos
-  sessionVotes SessionVote[]                 @relation("SessionResourceVotes") // Votos individuais no contexto desta sessão
+  sessionVotes SessionVote[]               @relation("SessionResourceVotes") // Votos individuais no contexto desta sessão
   attendances  SessionResourceAttendance[] // Presenças de partes no julgamento
   absences     SessionResourceAbsence[] // Ausências de membros no julgamento
 
@@ -790,9 +829,9 @@ model SessionVote {
   participationStatus ParticipationStatus
 
   // Voto que está sendo seguido (ao invés de followsMemberId)
-  followsVoteId   String?
-  followsVote     SessionVote?  @relation("FollowedVotes", fields: [followsVoteId], references: [id], onDelete: Restrict, onUpdate: NoAction)
-  votesFollowing  SessionVote[] @relation("FollowedVotes")
+  followsVoteId  String?
+  followsVote    SessionVote?  @relation("FollowedVotes", fields: [followsVoteId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  votesFollowing SessionVote[] @relation("FollowedVotes")
 
   // Tipo de conhecimento
   voteKnowledgeType String // "NAO_CONHECIMENTO" | "CONHECIMENTO"
@@ -833,11 +872,11 @@ model SessionVote {
 // Tabela de resultados (resultado consolidado da votação)
 model SessionResult {
   id         String   @id @default(uuid())
-  resourceId String   // Vinculado ao processo (Resource) para agregar votos de múltiplas sessões
+  resourceId String // Vinculado ao processo (Resource) para agregar votos de múltiplas sessões
   resource   Resource @relation("ResourceSessionResults", fields: [resourceId], references: [id], onDelete: Cascade)
 
   votingType String // "NAO_CONHECIMENTO", "CONHECIMENTO", "MERITO"
-  order      Int     @default(1) // Ordem de apresentação da votação (para ordenar cronologicamente)
+  order      Int    @default(1) // Ordem de apresentação da votação (para ordenar cronologicamente)
 
   // Se for votação de não conhecimento com preliminar específica
   preliminaryDecisionId String?
@@ -1157,23 +1196,24 @@ model Member {
 
   // Relacionamentos
   tramitations                Tramitation[]
-  sessionsAsPresident         Session[]                  @relation("SessionPresident")
-  sessionsPresent             SessionMember[]            @relation("SessionMembersPresent")
-  sessionResourcesAsPresident SessionResource[]          @relation("SessionResourcePresident")
-  sessionResourceViewRequests SessionResource[]          @relation("SessionResourceViewRequests")
-  sessionResourceAbsences     SessionResourceAbsence[]   @relation("SessionResourceAbsences")
-  distributionsAsFirst        SessionDistribution[]      @relation("DistributionFirstMember")
-  minutesAsPresident          SessionMinutes[]           @relation("MinutesPresident")
-  minutesPresent              SessionMinutesMember[]     @relation("MinutesMembersPresent")
-  minutesAbsences             SessionMinutesAbsence[]    @relation("MinutesAbsences")
+  sessionsAsPresident         Session[]                @relation("SessionPresident")
+  sessionsPresent             SessionMember[]          @relation("SessionMembersPresent")
+  sessionResourcesAsPresident SessionResource[]        @relation("SessionResourcePresident")
+  sessionResourceViewRequests SessionResource[]        @relation("SessionResourceViewRequests")
+  sessionResourceAbsences     SessionResourceAbsence[] @relation("SessionResourceAbsences")
+  distributionsAsFirst        SessionDistribution[]    @relation("DistributionFirstMember")
+  minutesAsPresident          SessionMinutes[]         @relation("MinutesPresident")
+  minutesPresent              SessionMinutesMember[]   @relation("MinutesMembersPresent")
+  minutesAbsences             SessionMinutesAbsence[]  @relation("MinutesAbsences")
 
   // Novos relacionamentos
   sessionVotes      SessionVote[]   @relation("MemberSessionVotes")
   votingsWon        SessionResult[] @relation("VotingWinnerMembers")
   qualityVotesGiven SessionResult[] @relation("QualityVoteMembers")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  distributionRecords SessionDistributionRecord[] @relation("MemberDistributionRecords")
 
   @@index([isActive])
   @@map("CCR_Member")

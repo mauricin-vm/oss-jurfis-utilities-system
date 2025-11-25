@@ -20,7 +20,7 @@ import {
   PlayCircle,
   Newspaper,
   Blinds,
-  ClipboardList,
+  Briefcase,
   GripVertical,
   UserCheck,
   RotateCcw,
@@ -1101,7 +1101,7 @@ export default function VisualizarSessaoPage() {
                             onClick={() => router.push(`/ccr/sessoes/${session.id}/assuntos-administrativos`)}
                             className="cursor-pointer"
                           >
-                            <ClipboardList className="h-4 w-4" />
+                            <Briefcase className="h-4 w-4" />
                           </Button>
                         </TooltipWrapper>
                         <TooltipWrapper content="Editar sessão">
