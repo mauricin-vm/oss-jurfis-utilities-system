@@ -42,13 +42,77 @@ export async function GET(req: Request) {
         processNumber: true,
         processName: true,
         sessionResults: {
-          include: {
+          where: {
+            status: 'CONCLUIDA',
+          },
+          select: {
+            id: true,
+            votingType: true,
+            status: true,
+            winningMember: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+              },
+            },
+            judgedInSession: {
+              select: {
+                id: true,
+                sessionNumber: true,
+                date: true,
+              },
+            },
+          },
+          orderBy: {
+            order: 'asc',
+          },
+        },
+        // Buscar a sessão onde foi julgado para obter relator, revisores e texto da ata
+        sessions: {
+          where: {
+            status: 'JULGADO',
+          },
+          select: {
+            id: true,
+            minutesText: true,
             session: {
               select: {
                 id: true,
                 sessionNumber: true,
                 date: true,
-                year: true,
+                distributions: {
+                  select: {
+                    id: true,
+                    resourceId: true,
+                    firstDistribution: {
+                      select: {
+                        id: true,
+                        name: true,
+                        role: true,
+                      },
+                    },
+                    reviewersIds: true,
+                  },
+                },
+                members: {
+                  select: {
+                    member: {
+                      select: {
+                        id: true,
+                        name: true,
+                        role: true,
+                      },
+                    },
+                  },
+                },
+                president: {
+                  select: {
+                    id: true,
+                    name: true,
+                    role: true,
+                  },
+                },
               },
             },
           },

@@ -934,9 +934,74 @@ model SessionResult {
 }
 
 // ============================================
-// ============================================
 // TABELA DE ACÓRDÃOS
 // ============================================
+model Decision {
+  id             String @id @default(uuid())
+  decisionNumber String @unique // "XXXX/YYYY"
+  sequenceNumber Int // XXXX
+  year           Int // YYYY (ano do julgamento)
+
+  // Relacionamento com o recurso
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  // Conteúdo do acórdão
+  ementaTitle String  @db.Text // Título da ementa
+  ementaBody  String  @db.Text // Corpo da ementa
+  votePath    String? // Caminho do voto anexado
+
+  // Status do acórdão (baseado nas publicações)
+  status DecisionStatus @default(PENDENTE)
+
+  // Arquivo do acórdão gerado
+  decisionFilePath String? // Caminho do arquivo do acórdão
+
+  // Publicações do acórdão (histórico)
+  publications DecisionPublication[]
+
+  // Auditoria
+  createdBy     String
+  createdByUser User     @relation("DecisionCreatedBy", fields: [createdBy], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([resourceId])
+  @@index([year, sequenceNumber])
+  @@index([status])
+  @@map("CCR_Decision")
+  @@schema("jurfis")
+}
+
+// Tabela de publicações do acórdão (histórico de publicações/republicações)
+model DecisionPublication {
+  id         String   @id @default(uuid())
+  decisionId String
+  decision   Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  // Número sequencial da publicação (1 = primeira, 2 = republicação, etc.)
+  publicationOrder Int
+
+  // Dados da publicação
+  publicationNumber String // Número da publicação no diário oficial
+  publicationDate   DateTime // Data da publicação
+
+  // Snapshot do conteúdo no momento da publicação (para histórico)
+  ementaTitleSnapshot String @db.Text // Título da ementa no momento da publicação
+  ementaBodySnapshot  String @db.Text // Corpo da ementa no momento da publicação
+
+  // Motivo da republicação (apenas para publicationOrder > 1)
+  republishReason String? @db.Text
+
+  // Auditoria
+  createdAt DateTime @default(now())
+
+  @@unique([decisionId, publicationOrder])
+  @@index([decisionId])
+  @@index([publicationDate])
+  @@map("CCR_DecisionPublication")
+  @@schema("jurfis")
+}
 
 // ============================================
 // ============================================
@@ -1158,76 +1223,6 @@ model Sector {
 
   @@index([isActive])
   @@map("CCR_Sector")
-  @@schema("jurfis")
-}
-
-// ============================================
-// TABELA DE ACÓRDÃOS
-// ============================================
-model Decision {
-  id             String @id @default(uuid())
-  decisionNumber String @unique // "XXXX/YYYY"
-  sequenceNumber Int // XXXX
-  year           Int // YYYY (ano do julgamento)
-
-  // Relacionamento com o recurso
-  resourceId String
-  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-
-  // Conteúdo do acórdão
-  ementaTitle String  @db.Text // Título da ementa
-  ementaBody  String  @db.Text // Corpo da ementa
-  votePath    String? // Caminho do voto anexado
-
-  // Status do acórdão (baseado nas publicações)
-  status DecisionStatus @default(PENDENTE)
-
-  // Arquivo do acórdão gerado
-  decisionFilePath String? // Caminho do arquivo do acórdão
-
-  // Publicações do acórdão (histórico)
-  publications DecisionPublication[]
-
-  // Auditoria
-  createdBy     String
-  createdByUser User     @relation("DecisionCreatedBy", fields: [createdBy], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([resourceId])
-  @@index([year, sequenceNumber])
-  @@index([status])
-  @@map("CCR_Decision")
-  @@schema("jurfis")
-}
-
-// Tabela de publicações do acórdão (histórico de publicações/republicações)
-model DecisionPublication {
-  id         String   @id @default(uuid())
-  decisionId String
-  decision   Decision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
-
-  // Número sequencial da publicação (1 = primeira, 2 = republicação, etc.)
-  publicationOrder Int
-
-  // Dados da publicação
-  publicationNumber String // Número da publicação no diário oficial
-  publicationDate   DateTime // Data da publicação
-
-  // Snapshot do conteúdo no momento da publicação (para histórico)
-  ementaTitleSnapshot String @db.Text // Título da ementa no momento da publicação
-  ementaBodySnapshot  String @db.Text // Corpo da ementa no momento da publicação
-
-  // Motivo da republicação (apenas para publicationOrder > 1)
-  republishReason String? @db.Text
-
-  // Auditoria
-  createdAt DateTime @default(now())
-
-  @@unique([decisionId, publicationOrder])
-  @@index([decisionId])
-  @@index([publicationDate])
-  @@map("CCR_DecisionPublication")
   @@schema("jurfis")
 }
 

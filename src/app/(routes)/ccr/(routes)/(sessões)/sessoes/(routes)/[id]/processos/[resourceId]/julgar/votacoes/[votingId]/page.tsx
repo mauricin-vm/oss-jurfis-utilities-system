@@ -1074,28 +1074,32 @@ export default function VotingDetailsPage() {
             {registeredVotes.length > 0 && (
               <div className="mt-6 pt-6 border-t">
                 <label className="block text-sm font-medium mb-2">Votos</label>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {registeredVotes.map((vote) => (
-                    <div key={vote.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                      <div className="flex items-center gap-3">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{vote.member.name}</p>
-                          <div className="flex items-center gap-2 mt-1">
+                    <div key={vote.id} className="p-3 bg-gray-50 rounded-lg border">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium text-sm">{vote.member.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {vote.voteType === 'RELATOR' ? 'Relator' : 'Revisor'}
                             </p>
-                            <p className="text-xs text-muted-foreground">
-                              • {formatVoteDecision(vote)}
-                            </p>
                           </div>
                         </div>
+                        {vote.session && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <Calendar className="h-3 w-3" />
+                            Sessão n. {vote.session.sessionNumber} - {format(new Date(vote.session.date), 'dd/MM/yyyy', { locale: ptBR })}
+                          </p>
+                        )}
                       </div>
-                      {vote.session && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                          <Calendar className="h-3 w-3" />
-                          Sessão n. {vote.session.sessionNumber} - {format(new Date(vote.session.date), 'dd/MM/yyyy', { locale: ptBR })}
-                        </p>
+                      {vote.voteText && (
+                        <div className="mt-3 pt-3 border-t">
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap text-justify">
+                            {vote.voteText}
+                          </p>
+                        </div>
                       )}
                     </div>
                   ))}

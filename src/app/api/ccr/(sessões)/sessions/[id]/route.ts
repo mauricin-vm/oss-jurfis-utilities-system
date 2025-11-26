@@ -95,12 +95,6 @@ export async function GET(
             distributionOrder: 'asc',
           },
         },
-        minutes: {
-          select: {
-            id: true,
-            minutesNumber: true,
-          },
-        },
         publications: {
           select: {
             id: true,
@@ -381,7 +375,6 @@ export async function DELETE(
             resources: true,
           },
         },
-        minutes: true,
       },
     });
 
@@ -389,10 +382,10 @@ export async function DELETE(
       return new NextResponse('Sessão não encontrada', { status: 404 });
     }
 
-    // Não permitir exclusão se já tem recursos ou atas
-    if (sessionData._count.resources > 0 || sessionData.minutes !== null) {
+    // Não permitir exclusão se já tem recursos
+    if (sessionData._count.resources > 0) {
       return new NextResponse(
-        'Não é possível excluir sessão com recursos ou atas registradas',
+        'Não é possível excluir sessão com recursos registrados',
         { status: 400 }
       );
     }

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prismadb from '@/lib/prismadb';
+import { writeFile, mkdir } from 'fs/promises';
+import path from 'path';
 
 export async function GET(req: Request) {
   try {
@@ -73,8 +75,12 @@ export async function POST(req: Request) {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
-    const body = await req.json();
-    const { resourceId, ementaTitle, ementaBody, votePath } = body;
+    // Parse FormData
+    const formData = await req.formData();
+    const resourceId = formData.get('resourceId') as string;
+    const ementaTitle = formData.get('ementaTitle') as string;
+    const ementaBody = formData.get('ementaBody') as string;
+    const voteFile = formData.get('voteFile') as File | null;
 
     if (!resourceId) {
       return new NextResponse('Recurso é obrigatório', { status: 400 });
@@ -135,6 +141,27 @@ export async function POST(req: Request) {
     const sequenceNumber = lastDecision ? lastDecision.sequenceNumber + 1 : 1;
     const decisionNumber = `${String(sequenceNumber).padStart(4, '0')}/${judgmentYear}`;
 
+    // Salvar arquivo do voto (se fornecido)
+    let votePath: string | null = null;
+    if (voteFile) {
+      const baseDir = process.env.CCR_ACORDAO_DIR;
+      if (!baseDir) {
+        return new NextResponse('Variável CCR_ACORDAO_DIR não configurada', { status: 500 });
+      }
+
+      const uploadsDir = path.join(baseDir, String(judgmentYear));
+      await mkdir(uploadsDir, { recursive: true });
+
+      const fileName = `RV ${resource.resourceNumber.replace('/', '-')}.pdf`;
+      const filePath = path.join(uploadsDir, fileName);
+
+      const bytes = await voteFile.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      await writeFile(filePath, buffer);
+
+      votePath = path.join(String(judgmentYear), fileName);
+    }
+
     const decision = await prismadb.decision.create({
       data: {
         decisionNumber,
@@ -143,7 +170,7 @@ export async function POST(req: Request) {
         resourceId,
         ementaTitle,
         ementaBody,
-        votePath: votePath || null,
+        votePath,
         status: 'PENDENTE',
         createdBy: session.user.id,
       },

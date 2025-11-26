@@ -334,7 +334,7 @@ export default function EditarAtaPage() {
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Ex: /atas/2025/ata_0001_2025.pdf"
+                          placeholder="Ex: S:/JURFIS/Compartilhamento/Atas/Atas 2025/0001 2025 21-01.docx"
                           className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
                           {...field}
                         />
