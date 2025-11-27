@@ -231,47 +231,58 @@ export default function EditarAcordaoPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {/* Informações do Recurso (somente leitura) */}
-          <div className="mb-6 p-4 bg-muted/50 rounded-lg">
-            <h3 className="text-sm font-medium mb-3">Informações do Recurso</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">Número do Recurso:</span>
-                <p className="font-medium">{decision.resource.resourceNumber}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Número do Processo:</span>
-                <p className="font-medium">{decision.resource.processNumber}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Nome do Processo:</span>
-                <p className="font-medium">{decision.resource.processName || '-'}</p>
-              </div>
-            </div>
-          </div>
-
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* Número do Acórdão */}
-              <FormField
-                control={form.control}
-                name="decisionNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Número do Acórdão <span className="text-red-500">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Ex: 0001/2025"
-                        className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Linha 1: Número do Processo e Número do Recurso */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Número do Processo</label>
+                  <Input
+                    value={decision.resource.processNumber}
+                    readOnly
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 cursor-default"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Número do Recurso</label>
+                  <Input
+                    value={decision.resource.resourceNumber}
+                    readOnly
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 cursor-default"
+                  />
+                </div>
+              </div>
+
+              {/* Linha 2: Número do Acórdão e Razão Social */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="decisionNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Número do Acórdão <span className="text-red-500">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Ex: 0001/2025"
+                          className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Razão Social</label>
+                  <Input
+                    value={decision.resource.processName || '-'}
+                    readOnly
+                    className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 cursor-default"
+                  />
+                </div>
+              </div>
 
               {/* Título da Ementa */}
               <FormField

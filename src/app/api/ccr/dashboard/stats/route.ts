@@ -110,14 +110,14 @@ export async function GET(req: Request) {
       },
     });
 
-    // Notificações
-    const totalNotifications = await prismadb.notification.count();
-    const notificationsByStatus = await prismadb.notification.groupBy({
+    // Intimações (Listas de Intimação)
+    const totalNotifications = await prismadb.notificationList.count();
+    const notificationsByStatus = await prismadb.notificationList.groupBy({
       by: ['status'],
       _count: true,
     });
 
-    const pendingNotifications = await prismadb.notification.count({
+    const pendingNotifications = await prismadb.notificationList.count({
       where: {
         status: 'PENDENTE',
       },

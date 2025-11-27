@@ -122,6 +122,16 @@ export async function PUT(
       updateData.year = year;
     }
 
+    // Verificar se houve alteração na ementa quando já foi publicado
+    const ementaChanged =
+      (ementaTitle !== undefined && ementaTitle !== existingDecision.ementaTitle) ||
+      (ementaBody !== undefined && ementaBody !== existingDecision.ementaBody);
+
+    // Se a ementa foi alterada e o acórdão já foi publicado, voltar status para PENDENTE
+    if (ementaChanged && (existingDecision.status === 'PUBLICADO' || existingDecision.status === 'REPUBLICADO')) {
+      updateData.status = 'PENDENTE';
+    }
+
     if (ementaTitle !== undefined) {
       updateData.ementaTitle = ementaTitle;
     }

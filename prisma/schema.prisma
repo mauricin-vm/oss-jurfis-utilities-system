@@ -27,16 +27,17 @@ model User {
   overtimeRecords     OvertimeRecord[]
 
   // CCR Module Relations
-  partsCreated         Part[]            @relation("PartCreatedBy")
-  contactsCreated      Contact[]         @relation("ContactCreatedBy")
-  protocolsCreated     Protocol[]        @relation("ProtocolEmployee")
-  tramitationsCreated  Tramitation[]     @relation("TramitationCreatedBy")
-  sessionsCreated      Session[]         @relation("SessionCreatedBy")
-  notificationsCreated Notification[]    @relation("NotificationCreatedBy")
-  documentsUploaded    Document[]        @relation("DocumentUploadedBy")
-  publicationsCreated  Publication[]     @relation("PublicationCreatedBy")
-  historyCreated       ResourceHistory[] @relation("HistoryCreatedBy")
-  decisionsCreated     Decision[]        @relation("DecisionCreatedBy")
+  partsCreated               Part[]             @relation("PartCreatedBy")
+  contactsCreated            Contact[]          @relation("ContactCreatedBy")
+  protocolsCreated           Protocol[]         @relation("ProtocolEmployee")
+  tramitationsCreated        Tramitation[]      @relation("TramitationCreatedBy")
+  sessionsCreated            Session[]          @relation("SessionCreatedBy")
+  notificationListsCreated    NotificationList[]    @relation("NotificationListCreatedBy")
+  notificationAttemptsConfirmed NotificationAttempt[] @relation("NotificationAttemptConfirmedBy")
+  documentsUploaded          Document[]         @relation("DocumentUploadedBy")
+  publicationsCreated        Publication[]      @relation("PublicationCreatedBy")
+  historyCreated             ResourceHistory[]  @relation("HistoryCreatedBy")
+  decisionsCreated           Decision[]         @relation("DecisionCreatedBy")
 
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
@@ -185,6 +186,15 @@ model Part {
   @@schema("jurfis")
 }
 
+enum PartRole {
+  REQUERENTE
+  PATRONO
+  REPRESENTANTE
+  OUTRO
+
+  @@schema("jurfis")
+}
+
 // ============================================
 // TABELA DE CONTATOS
 // ============================================
@@ -223,6 +233,13 @@ model Contact {
   @@index([type])
   @@index([value]) // Para busca rápida por email/telefone
   @@map("CCR_Contact")
+  @@schema("jurfis")
+}
+
+enum ContactType {
+  TELEFONE
+  EMAIL
+
   @@schema("jurfis")
 }
 
@@ -275,6 +292,14 @@ model ProtocolPart {
   @@schema("jurfis")
 }
 
+enum ProtocolStatus {
+  PENDENTE
+  CONCLUIDO
+  ARQUIVADO
+
+  @@schema("jurfis")
+}
+
 // ============================================
 // TABELA DE RECURSOS
 // ============================================
@@ -297,17 +322,17 @@ model Resource {
 
   // Relacionamentos
   // Partes são acessadas via processNumber: Part.findMany({ where: { processNumber } })
-  subjects       SubjectChildren[] // Assuntos do recurso (many-to-many com hierarquia)
-  registrations  Registration[] // Inscrições e valores do recurso
-  authorities    Authority[] // Autoridades vinculadas ao recurso
-  addresses      Address[] // Endereços vinculados ao recurso
-  sessions       SessionResource[]
-  distributions  SessionDistribution[]
-  documents      Document[]
-  publications   Publication[]
-  history        ResourceHistory[]
-  notifications  Notification[]
-  sessionResults SessionResult[]       @relation("ResourceSessionResults") // Resultados de votações do processo
+  subjects          SubjectChildren[] // Assuntos do recurso (many-to-many com hierarquia)
+  registrations     Registration[] // Inscrições e valores do recurso
+  authorities       Authority[] // Autoridades vinculadas ao recurso
+  addresses         Address[] // Endereços vinculados ao recurso
+  sessions          SessionResource[]
+  distributions     SessionDistribution[]
+  documents         Document[]
+  publications      Publication[]
+  history           ResourceHistory[]
+  notificationItems NotificationItem[]
+  sessionResults    SessionResult[]       @relation("ResourceSessionResults") // Resultados de votações do processo
 
   createdAt           DateTime                    @default(now())
   updatedAt           DateTime                    @updatedAt
@@ -319,6 +344,32 @@ model Resource {
   @@index([status])
   @@index([type])
   @@map("CCR_Resource")
+  @@schema("jurfis")
+}
+
+enum ResourceStatus {
+  EM_ANALISE
+  TEMPESTIVIDADE
+  CONTRARRAZAO
+  PARECER_PGM
+  DISTRIBUICAO
+  NOTIFICACAO_JULGAMENTO
+  JULGAMENTO
+  DILIGENCIA
+  PEDIDO_VISTA
+  SUSPENSO
+  PUBLICACAO_ACORDAO
+  ASSINATURA_ACORDAO
+  NOTIFICACAO_DECISAO
+  CONCLUIDO
+
+  @@schema("jurfis")
+}
+
+enum ResourceType {
+  VOLUNTARIO
+  OFICIO
+
   @@schema("jurfis")
 }
 
@@ -348,6 +399,14 @@ model Address {
   @@index([resourceId])
   @@index([type])
   @@map("CCR_Address")
+  @@schema("jurfis")
+}
+
+enum AddressType {
+  CORRESPONDENCIA
+  RECURSO
+  OUTRO
+
   @@schema("jurfis")
 }
 
@@ -412,6 +471,14 @@ model PublicationSessionSnapshot {
   @@schema("jurfis")
 }
 
+enum PublicationType {
+  SESSAO
+  ACORDAO
+  CIENCIA
+
+  @@schema("jurfis")
+}
+
 // ============================================
 // TABELA DE INSCRIÇÕES
 // ============================================
@@ -460,6 +527,15 @@ model RegistrationValue {
   @@schema("jurfis")
 }
 
+enum RegistrationType {
+  IMOBILIARIA
+  ECONOMICA
+  CPF
+  CNPJ
+
+  @@schema("jurfis")
+}
+
 // ============================================
 // TABELA DE TRAMITAÇÕES
 // ============================================
@@ -504,6 +580,24 @@ model Tramitation {
   @@schema("jurfis")
 }
 
+enum TramitationPurpose {
+  SOLICITAR_PROCESSO
+  CONTRARRAZAO
+  PARECER_PGM
+  JULGAMENTO
+  DILIGENCIA
+  OUTRO
+
+  @@schema("jurfis")
+}
+
+enum TramitationStatus {
+  PENDENTE
+  ENTREGUE
+
+  @@schema("jurfis")
+}
+
 // ============================================
 // TABELA DE DOCUMENTOS
 // ============================================
@@ -531,6 +625,16 @@ model Document {
   @@schema("jurfis")
 }
 
+enum DocumentType {
+  RECURSO
+  CONTRARRAZAO
+  PARECER
+  VOTO
+  OUTROS
+
+  @@schema("jurfis")
+}
+
 // ============================================
 // HISTÓRICO
 // ============================================
@@ -552,6 +656,18 @@ model ResourceHistory {
   @@index([createdAt])
   @@index([isManual])
   @@map("CCR_ResourceHistory")
+  @@schema("jurfis")
+}
+
+enum HistoryAction {
+  CREATED
+  UPDATED
+  STATUS_CHANGED
+  DOCUMENT_ADDED
+  SESSION_ADDED
+  NOTIFICATION_SENT
+  TRAMITATION_ADDED
+
   @@schema("jurfis")
 }
 
@@ -933,6 +1049,66 @@ model SessionResult {
   @@schema("jurfis")
 }
 
+enum SessionType {
+  ORDINARIA
+  EXTRAORDINARIA
+  OUTRO
+
+  @@schema("jurfis")
+}
+
+enum SessionStatus {
+  PUBLICACAO // Aguardando publicação da pauta ou republicação após alterações
+  PENDENTE // Pauta publicada, aguardando sessão e julgamentos
+  CONCLUIDA // Sessão finalizada
+  CANCELADA // Sessão cancelada
+
+  @@schema("jurfis")
+}
+
+enum MinutesStatus {
+  PENDENTE // Ata pendente de geração
+  GERADA // Ata gerada
+
+  @@schema("jurfis")
+}
+
+enum SessionResourceStatus {
+  EM_PAUTA
+  SUSPENSO
+  DILIGENCIA
+  PEDIDO_VISTA
+  JULGADO
+
+  @@schema("jurfis")
+}
+
+enum DecisionType {
+  PRELIMINAR
+  MERITO
+  OFICIO
+
+  @@schema("jurfis")
+}
+
+enum VoteType {
+  RELATOR
+  REVISOR
+  PRESIDENTE
+  VOTANTE
+
+  @@schema("jurfis")
+}
+
+enum ParticipationStatus {
+  PRESENTE
+  IMPEDIDO
+  SUSPEITO
+  ABSTENCAO
+
+  @@schema("jurfis")
+}
+
 // ============================================
 // TABELA DE ACÓRDÃOS
 // ============================================
@@ -1003,71 +1179,138 @@ model DecisionPublication {
   @@schema("jurfis")
 }
 
-// ============================================
-// ============================================
-// TABELA DE NOTIFICAÇÕES
-// ============================================
-model Notification {
-  id         String    @id @default(uuid())
-  resourceId String?
-  resource   Resource? @relation(fields: [resourceId], references: [id])
+enum DecisionStatus {
+  PENDENTE // Acórdão criado, ainda não publicado
+  PUBLICADO // Acórdão publicado
+  REPUBLICADO // Acórdão teve republicação
 
-  type NotificationType
-
-  sectorId String?
-  sector   Sector? @relation(fields: [sectorId], references: [id])
-
-  destination String?
-
-  subject String
-  message String @db.Text
-
-  scheduledFor DateTime?
-  status       NotificationStatus @default(PENDENTE)
-
-  contacts NotificationContact[]
-
-  createdBy     String
-  createdByUser User     @relation("NotificationCreatedBy", fields: [createdBy], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([status])
-  @@index([scheduledFor])
-  @@index([resourceId])
-  @@index([sectorId])
-  @@map("CCR_Notification")
   @@schema("jurfis")
 }
 
-model NotificationContact {
-  id             String       @id @default(uuid())
-  notificationId String
-  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+// ============================================
+// ============================================
+// TABELA DE LISTAS DE NOTIFICAÇÕES
+// ============================================
+model NotificationList {
+  id             String               @id @default(uuid())
+  listNumber     String               @unique // "XXX/YYYY"
+  sequenceNumber Int // XXX
+  year           Int // YYYY
+  type           NotificationListType // Tipo da lista
 
-  channel NotificationChannel
-  contact String?
+  status NotificationListStatus @default(PENDENTE)
 
-  attemptCount  Int       @default(0)
-  lastAttemptAt DateTime?
+  items NotificationItem[]
 
-  status      NotificationContactStatus @default(PENDENTE)
-  sentAt      DateTime?
-  deliveredAt DateTime?
-  confirmedAt DateTime?
+  createdBy     String
+  createdByUser User     @relation("NotificationListCreatedBy", fields: [createdBy], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  error        String? @db.Text
+  @@unique([sequenceNumber, year])
+  @@index([status])
+  @@index([year])
+  @@map("CCR_NotificationList")
+  @@schema("jurfis")
+}
+
+model NotificationItem {
+  id     String           @id @default(uuid())
+  listId String
+  list   NotificationList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id])
+
+  // Tentativas de envio
+  attempts NotificationAttempt[]
+
   observations String? @db.Text
-
-  metadata Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([notificationId])
-  @@index([channel])
+  @@unique([listId, resourceId])
+  @@index([listId])
+  @@index([resourceId])
+  @@map("CCR_NotificationItem")
+  @@schema("jurfis")
+}
+
+// Tentativa de notificação (cada envio com seu prazo e canal)
+model NotificationAttempt {
+  id     String           @id @default(uuid())
+  itemId String
+  item   NotificationItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  attemptNumber Int // 1, 2, 3...
+
+  // Canal de notificação
+  channel NotificationChannel
+
+  // Informações do envio
+  sentAt   DateTime? // Quando foi enviada (null = ainda não enviada)
+  sentTo   String?   // Para quem (email, telefone, endereço formatado)
+  sentToId String?   // ID do contato ou endereço usado (para referência)
+
+  // Prazo desta tentativa
+  deadline DateTime?
+
+  // Status desta tentativa
+  status NotificationAttemptStatus @default(PENDENTE)
+
+  // Ciência desta tentativa
+  confirmedAt     DateTime?
+  confirmedBy     String?
+  confirmedByUser User?     @relation("NotificationAttemptConfirmedBy", fields: [confirmedBy], references: [id])
+
+  observations String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([itemId, attemptNumber])
+  @@index([itemId])
   @@index([status])
-  @@map("CCR_NotificationContact")
+  @@index([deadline])
+  @@index([channel])
+  @@map("CCR_NotificationAttempt")
+  @@schema("jurfis")
+}
+
+enum NotificationListStatus {
+  PENDENTE
+  FINALIZADA
+
+  @@schema("jurfis")
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+  CORREIOS
+  PESSOALMENTE
+  EDITAL
+
+  @@schema("jurfis")
+}
+
+enum NotificationListType {
+  ADMISSIBILIDADE
+  SESSAO
+  DILIGENCIA
+  DECISAO
+  OUTRO
+
+  @@schema("jurfis")
+}
+
+enum NotificationAttemptStatus {
+  PENDENTE   // Criada mas não enviada ainda
+  ENVIADO    // Enviada, aguardando ciência
+  CONFIRMADO // Ciência confirmada
+  EXPIRADO   // Prazo expirou sem ciência
+
   @@schema("jurfis")
 }
 
@@ -1159,6 +1402,15 @@ model AuthorityRegistered {
   @@schema("jurfis")
 }
 
+enum AuthorityType {
+  AUTOR_PROCEDIMENTO_FISCAL
+  JULGADOR_SINGULAR
+  COORDENADOR
+  OUTROS
+
+  @@schema("jurfis")
+}
+
 // ============================================
 // TABELA DE MEMBROS
 // ============================================
@@ -1197,6 +1449,13 @@ model Member {
   @@schema("jurfis")
 }
 
+enum Gender {
+  MASCULINO
+  FEMININO
+
+  @@schema("jurfis")
+}
+
 // ============================================
 // TABELA DE SETORES E RELACIONAMENTO
 // ============================================
@@ -1215,267 +1474,12 @@ model Sector {
   isActive Boolean @default(true)
 
   // Relacionamentos
-  tramitations  Tramitation[]
-  notifications Notification[]
+  tramitations Tramitation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([isActive])
   @@map("CCR_Sector")
-  @@schema("jurfis")
-}
-
-// ============================================
-// ENUMS
-// ============================================
-enum DecisionStatus {
-  PENDENTE // Acórdão criado, ainda não publicado
-  PUBLICADO // Acórdão publicado
-  REPUBLICADO // Acórdão teve republicação
-
-  @@schema("jurfis")
-}
-
-enum PartRole {
-  REQUERENTE
-  PATRONO
-  REPRESENTANTE
-  OUTRO
-
-  @@schema("jurfis")
-}
-
-enum ContactType {
-  TELEFONE
-  EMAIL
-
-  @@schema("jurfis")
-}
-
-enum ProtocolStatus {
-  PENDENTE
-  CONCLUIDO
-  ARQUIVADO
-
-  @@schema("jurfis")
-}
-
-enum ResourceStatus {
-  EM_ANALISE
-  TEMPESTIVIDADE
-  CONTRARRAZAO
-  PARECER_PGM
-  DISTRIBUICAO
-  NOTIFICACAO_JULGAMENTO
-  JULGAMENTO
-  DILIGENCIA
-  PEDIDO_VISTA
-  SUSPENSO
-  PUBLICACAO_ACORDAO
-  ASSINATURA_ACORDAO
-  NOTIFICACAO_DECISAO
-  CONCLUIDO
-
-  @@schema("jurfis")
-}
-
-enum ResourceType {
-  VOLUNTARIO
-  OFICIO
-
-  @@schema("jurfis")
-}
-
-enum AddressType {
-  CORRESPONDENCIA
-  RECURSO
-  OUTRO
-
-  @@schema("jurfis")
-}
-
-enum PublicationType {
-  SESSAO
-  ACORDAO
-  CIENCIA
-
-  @@schema("jurfis")
-}
-
-enum RegistrationType {
-  IMOBILIARIA
-  ECONOMICA
-  CPF
-  CNPJ
-
-  @@schema("jurfis")
-}
-
-enum TramitationPurpose {
-  SOLICITAR_PROCESSO
-  CONTRARRAZAO
-  PARECER_PGM
-  JULGAMENTO
-  DILIGENCIA
-  OUTRO
-
-  @@schema("jurfis")
-}
-
-enum TramitationStatus {
-  PENDENTE
-  ENTREGUE
-
-  @@schema("jurfis")
-}
-
-enum DocumentType {
-  RECURSO
-  CONTRARRAZAO
-  PARECER
-  VOTO
-  OUTROS
-
-  @@schema("jurfis")
-}
-
-enum HistoryAction {
-  CREATED
-  UPDATED
-  STATUS_CHANGED
-  DOCUMENT_ADDED
-  SESSION_ADDED
-  NOTIFICATION_SENT
-  TRAMITATION_ADDED
-
-  @@schema("jurfis")
-}
-
-enum SessionType {
-  ORDINARIA
-  EXTRAORDINARIA
-  OUTRO
-
-  @@schema("jurfis")
-}
-
-enum SessionStatus {
-  PUBLICACAO // Aguardando publicação da pauta ou republicação após alterações
-  PENDENTE // Pauta publicada, aguardando sessão e julgamentos
-  CONCLUIDA // Sessão finalizada
-  CANCELADA // Sessão cancelada
-
-  @@schema("jurfis")
-}
-
-enum MinutesStatus {
-  PENDENTE // Ata pendente de geração
-  GERADA // Ata gerada
-
-  @@schema("jurfis")
-}
-
-enum SessionResourceStatus {
-  EM_PAUTA
-  SUSPENSO
-  DILIGENCIA
-  PEDIDO_VISTA
-  JULGADO
-
-  @@schema("jurfis")
-}
-
-enum DistributionType {
-  RELATOR
-  REVISOR
-
-  @@schema("jurfis")
-}
-
-enum DecisionType {
-  PRELIMINAR
-  MERITO
-  OFICIO
-
-  @@schema("jurfis")
-}
-
-enum VotingType {
-  PRELIMINAR
-  MERITO
-
-  @@schema("jurfis")
-}
-
-enum VoteType {
-  RELATOR
-  REVISOR
-  PRESIDENTE
-  VOTANTE
-
-  @@schema("jurfis")
-}
-
-enum ParticipationStatus {
-  PRESENTE
-  IMPEDIDO
-  SUSPEITO
-  ABSTENCAO
-
-  @@schema("jurfis")
-}
-
-enum NotificationType {
-  ADMISSIBILIDADE
-  SESSAO
-  DILIGENCIA
-  DECISAO
-  OUTRO
-
-  @@schema("jurfis")
-}
-
-enum NotificationStatus {
-  PENDENTE
-  ENVIADO
-  ERRO
-  AGENDADO
-
-  @@schema("jurfis")
-}
-
-enum NotificationContactStatus {
-  PENDENTE
-  ENVIADO
-  ENTREGUE
-  CONFIRMADO
-  ERRO
-
-  @@schema("jurfis")
-}
-
-enum NotificationChannel {
-  EMAIL
-  WHATSAPP
-  CORREIOS
-  EDITAL
-
-  @@schema("jurfis")
-}
-
-enum AuthorityType {
-  AUTOR_PROCEDIMENTO_FISCAL
-  JULGADOR_SINGULAR
-  COORDENADOR
-  OUTROS
-
-  @@schema("jurfis")
-}
-
-enum Gender {
-  MASCULINO
-  FEMININO
-
   @@schema("jurfis")
 }

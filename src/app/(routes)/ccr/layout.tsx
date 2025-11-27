@@ -6,13 +6,13 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useSidebarConfig } from '@/contexts/sidebar-context';
 import {
   LayoutDashboard,
-  FileText,
+  BookOpenText,
   Search,
   ArrowRightLeft,
   Calendar,
   FileStack,
   Gavel,
-  Bell,
+  Mails,
   Settings,
   Users,
   Building2,
@@ -66,7 +66,7 @@ export default function CCRLayout({ children }: { children: React.ReactNode }) {
         // Recursos - colapsável
         {
           label: 'Recursos',
-          icon: FileText,
+          icon: BookOpenText,
           collapsible: true,
           defaultOpen: false,
           subItems: [
@@ -78,7 +78,7 @@ export default function CCRLayout({ children }: { children: React.ReactNode }) {
         // Sessões - colapsável
         {
           label: 'Sessões',
-          icon: Calendar,
+          icon: Gavel,
           collapsible: true,
           defaultOpen: false,
           subItems: [
@@ -87,8 +87,8 @@ export default function CCRLayout({ children }: { children: React.ReactNode }) {
             { label: 'Acórdãos', href: '/ccr/acordaos' },
           ],
         },
-        // Notificações - item único sem colapsar
-        { label: 'Notificações', icon: Bell, href: '/ccr/notificacoes' },
+        // Intimações - item único sem colapsar
+        { label: 'Intimações', icon: Mails, href: '/ccr/intimacoes' },
       ];
 
       // Adicionar Configurações apenas se houver subitens (não EXTERNAL)
@@ -198,7 +198,7 @@ export default function CCRLayout({ children }: { children: React.ReactNode }) {
           },
         });
       }
-      // Se estiver na página de acórdãos, adicionar botões "Novo Acórdão" e "Publicação de Acórdão"
+      // Se estiver na página de acórdãos, adicionar botões "Novo Acórdão" e "Publicar Acórdãos"
       else if (pathname?.startsWith('/ccr/acordaos')) {
         customActions.push({
           label: 'Novo Acórdão',
@@ -206,9 +206,17 @@ export default function CCRLayout({ children }: { children: React.ReactNode }) {
           onClick: () => router.push('/ccr/acordaos/novo'),
         });
         customActions.push({
-          label: 'Publicação de Acórdão',
+          label: 'Publicar Acórdãos',
           icon: Newspaper,
-          onClick: () => router.push('/ccr/acordaos'),
+          onClick: () => router.push('/ccr/acordaos/publicar'),
+        });
+      }
+      // Se estiver na página de listagem de intimações, adicionar botão "Nova Lista"
+      else if (pathname === '/ccr/intimacoes') {
+        customActions.push({
+          label: 'Nova Lista',
+          icon: Plus,
+          onClick: () => router.push('/ccr/intimacoes/nova'),
         });
       }
 

@@ -30,7 +30,7 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { cn } from "@/lib/utils";
 import {
   MoreHorizontal,
-  Pencil,
+  Trash2,
   ChevronLeft,
   ChevronsLeft,
   ChevronRight,
@@ -40,80 +40,101 @@ import {
   Search,
   Clock,
   CheckCircle,
-  RefreshCw,
-  Printer,
-  FileText,
-  Send,
-  Undo2
+  Eye,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
-import { DecisionTableSkeleton } from './decision-skeleton';
-import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
 
-interface Decision {
+interface NotificationList {
   id: string;
-  decisionNumber: string;
+  listNumber: string;
   sequenceNumber: number;
   year: number;
-  ementaTitle: string;
-  ementaBody: string;
-  votePath: string | null;
+  type: string;
   status: string;
-  decisionFilePath: string | null;
-  resource: {
+  items: {
     id: string;
-    resourceNumber: string;
-    processNumber: string;
-    processName: string | null;
-  };
-  publications: {
-    id: string;
-    publicationOrder: number;
-    publicationNumber: string;
-    publicationDate: Date;
+    resource: {
+      id: string;
+      resourceNumber: string;
+      processNumber: string;
+      processName: string | null;
+    };
+    attempts: {
+      id: string;
+      channel: string;
+      status: string;
+      deadline: Date;
+    }[];
   }[];
   createdByUser: {
     id: string;
     name: string | null;
   };
   _count: {
-    publications: number;
+    items: number;
   };
   createdAt: Date;
 }
 
-interface DecisionTableProps {
-  data: Decision[];
+interface NotificationListTableProps {
+  data: NotificationList[];
   loading: boolean;
   onRefresh: () => void;
-  onNewDecision: () => void;
+  onNewList: () => void;
   userRole?: string;
 }
 
 const statusLabels: Record<string, string> = {
   PENDENTE: 'Pendente',
-  PUBLICADO: 'Publicado',
-  REPUBLICADO: 'Republicado',
+  FINALIZADA: 'Finalizada',
 };
 
 const statusStyles: Record<string, string> = {
   PENDENTE: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100',
-  PUBLICADO: 'bg-green-100 text-green-800 hover:bg-green-100',
-  REPUBLICADO: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
+  FINALIZADA: 'bg-green-100 text-green-800 hover:bg-green-100',
+};
+
+const typeLabels: Record<string, string> = {
+  ADMISSIBILIDADE: 'Admissibilidade',
+  SESSAO: 'Sessão',
+  DILIGENCIA: 'Diligência',
+  DECISAO: 'Decisão',
+  OUTRO: 'Outro',
 };
 
 const statusIcons: Record<string, React.ReactNode> = {
   PENDENTE: <Clock className="h-3.5 w-3.5" />,
-  PUBLICADO: <CheckCircle className="h-3.5 w-3.5" />,
-  REPUBLICADO: <RefreshCw className="h-3.5 w-3.5" />,
+  FINALIZADA: <CheckCircle className="h-3.5 w-3.5" />,
 };
 
-export function DecisionTable({ data, loading, onRefresh, onNewDecision, userRole }: DecisionTableProps) {
+function NotificationListTableSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end gap-2">
+        <Skeleton className="h-8 w-8" />
+        <Skeleton className="h-8 w-24" />
+        <Skeleton className="h-8 w-28" />
+      </div>
+      <div className="rounded-lg border bg-card">
+        <div className="p-4 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function NotificationListTable({ data, loading, onRefresh, onNewList, userRole }: NotificationListTableProps) {
   const router = useRouter();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const canDelete = userRole === 'ADMIN';
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [yearFilter, setYearFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState('');
@@ -141,66 +162,44 @@ export function DecisionTable({ data, loading, onRefresh, onNewDecision, userRol
     setCurrentPage(1);
   };
 
-  const handleGenerate = async (decision: Decision) => {
-    // Atualizar status se necessário e abrir página de impressão
-    if (decision.status === 'PENDENTE') {
-      // Se pendente, apenas gera/imprime
-      window.open(`/ccr/acordaos/${decision.id}/imprimir`, '_blank');
-    } else if (decision.decisionFilePath) {
-      // Se já publicado e tem arquivo, abre o arquivo
-      window.open(decision.decisionFilePath, '_blank');
-    } else {
-      // Se publicado mas sem arquivo, abre página de impressão
-      window.open(`/ccr/acordaos/${decision.id}/imprimir`, '_blank');
-    }
-  };
-
-  const handleRevert = async (decision: Decision) => {
+  const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`/api/ccr/decisions/${decision.id}/revert`, {
-        method: 'POST',
+      setDeletingId(id);
+      const response = await fetch(`/api/ccr/intimacoes/${id}`, {
+        method: 'DELETE',
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        toast.success('Lista removida com sucesso');
+        onRefresh();
+      } else {
         const error = await response.text();
-        throw new Error(error);
+        toast.error(error || 'Erro ao remover lista');
       }
-
-      toast.success(`Acórdão ${decision.decisionNumber} revertido com sucesso`);
-      onRefresh();
     } catch (error) {
-      console.error('Error reverting decision:', error);
-      toast.error(error instanceof Error ? error.message : 'Erro ao reverter acórdão');
+      console.error('Error deleting list:', error);
+      toast.error('Erro ao remover lista');
+    } finally {
+      setDeletingId(null);
     }
   };
 
-  // Obter anos únicos dos dados
-  const uniqueYears = Array.from(new Set(data.map(d => d.year))).sort((a, b) => b - a);
-
   // Filtrar dados
-  const filteredData = data.filter((decision) => {
-    const statusMatch = statusFilter === 'all' || decision.status === statusFilter;
-    const yearMatch = yearFilter === 'all' || decision.year.toString() === yearFilter;
+  const filteredData = data.filter((list) => {
+    const statusMatch = statusFilter === 'all' || list.status === statusFilter;
 
     const searchMatch = !searchQuery ||
-      decision.decisionNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      decision.resource.processNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      decision.resource.resourceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (decision.resource.processName && decision.resource.processName.toLowerCase().includes(searchQuery.toLowerCase()));
+      list.listNumber.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return statusMatch && yearMatch && searchMatch;
+    return statusMatch && searchMatch;
   });
 
-  // Dados já vêm ordenados do backend
-  const sortedData = filteredData;
-
   // Paginação
-  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedData = sortedData.slice(startIndex, endIndex);
+  const paginatedData = filteredData.slice(startIndex, endIndex);
 
-  // Reset page when filtered data changes
   if (currentPage > totalPages && totalPages > 0) {
     setCurrentPage(1);
   }
@@ -208,18 +207,17 @@ export function DecisionTable({ data, loading, onRefresh, onNewDecision, userRol
   // Contar por status
   const statusCounts = {
     all: data.length,
-    PENDENTE: data.filter(d => d.status === 'PENDENTE').length,
-    PUBLICADO: data.filter(d => d.status === 'PUBLICADO').length,
-    REPUBLICADO: data.filter(d => d.status === 'REPUBLICADO').length,
+    PENDENTE: data.filter(l => l.status === 'PENDENTE').length,
+    FINALIZADA: data.filter(l => l.status === 'FINALIZADA').length,
   };
 
   if (loading) {
-    return <DecisionTableSkeleton />;
+    return <NotificationListTableSkeleton />;
   }
 
   return (
     <div className="space-y-4">
-      {/* Botões de Busca e Filtros */}
+      {/* Botões de Busca, Filtros e Nova Lista */}
       <div className="flex justify-end gap-2">
         {/* Busca Animada */}
         <div className="relative flex items-center">
@@ -233,7 +231,7 @@ export function DecisionTable({ data, loading, onRefresh, onNewDecision, userRol
               <Input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Buscar acórdãos..."
+                placeholder="Buscar por número..."
                 value={searchQuery}
                 onChange={handleSearchChange}
                 onBlur={handleSearchBlur}
@@ -242,7 +240,7 @@ export function DecisionTable({ data, loading, onRefresh, onNewDecision, userRol
                   isSearchExpanded ? "opacity-100 z-10" : "opacity-0 pointer-events-none"
                 )}
               />
-              <TooltipWrapper content="Buscar por número do acórdão, processo, recurso ou razão social">
+              <TooltipWrapper content="Buscar por número">
                 <Button
                   variant="outline"
                   size="sm"
@@ -273,52 +271,19 @@ export function DecisionTable({ data, loading, onRefresh, onNewDecision, userRol
             <div className="p-4 space-y-4">
               <div className="space-y-2">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Ano
-                </label>
-                <Select
-                  value={yearFilter}
-                  onValueChange={(value) => setYearFilter(value)}
-                >
-                  <SelectTrigger className="h-10 w-full px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
-                    <SelectValue placeholder="Selecione o ano" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-md">
-                    <SelectItem value="all" className="cursor-pointer h-9">
-                      Todos os anos
-                    </SelectItem>
-                    {uniqueYears.map((year) => (
-                      <SelectItem key={year} value={year.toString()} className="cursor-pointer h-9">
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Status
+                  Situação
                 </label>
                 <Select
                   value={statusFilter}
                   onValueChange={(value) => setStatusFilter(value)}
                 >
                   <SelectTrigger className="h-10 w-full px-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:ring-offset-0 focus:border-gray-400 transition-colors">
-                    <SelectValue placeholder="Selecione o status" />
+                    <SelectValue placeholder="Selecione a situação" />
                   </SelectTrigger>
                   <SelectContent className="rounded-md">
-                    <SelectItem value="all" className="cursor-pointer h-9">
-                      Todos ({statusCounts.all})
-                    </SelectItem>
-                    <SelectItem value="PENDENTE" className="cursor-pointer h-9">
-                      Pendente ({statusCounts.PENDENTE})
-                    </SelectItem>
-                    <SelectItem value="PUBLICADO" className="cursor-pointer h-9">
-                      Publicado ({statusCounts.PUBLICADO})
-                    </SelectItem>
-                    <SelectItem value="REPUBLICADO" className="cursor-pointer h-9">
-                      Republicado ({statusCounts.REPUBLICADO})
-                    </SelectItem>
+                    <SelectItem value="all" className="cursor-pointer h-9">Todas ({statusCounts.all})</SelectItem>
+                    <SelectItem value="PENDENTE" className="cursor-pointer h-9">Pendente ({statusCounts.PENDENTE})</SelectItem>
+                    <SelectItem value="FINALIZADA" className="cursor-pointer h-9">Finalizada ({statusCounts.FINALIZADA})</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -326,15 +291,15 @@ export function DecisionTable({ data, loading, onRefresh, onNewDecision, userRol
 
             <div className="border-t p-3">
               <div className="text-xs text-muted-foreground text-center">
-                {filteredData.length} {filteredData.length === 1 ? 'acórdão' : 'acórdãos'} encontrado{filteredData.length !== 1 ? 's' : ''}
+                {filteredData.length} {filteredData.length === 1 ? 'lista encontrada' : 'listas encontradas'}
               </div>
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Button size="sm" onClick={onNewDecision} className="h-8 gap-2 cursor-pointer">
+        <Button size="sm" onClick={onNewList} className="h-8 gap-2 cursor-pointer">
           <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Novo Acórdão</span>
+          <span className="hidden sm:inline">Nova Lista</span>
         </Button>
       </div>
 
@@ -342,60 +307,52 @@ export function DecisionTable({ data, loading, onRefresh, onNewDecision, userRol
       {filteredData.length === 0 ? (
         <div className="rounded-lg border bg-card text-card-foreground shadow-sm">
           <div className="p-8 text-center">
-            <p className="text-muted-foreground">Nenhum acórdão encontrado.</p>
-            <p className="text-sm text-muted-foreground mt-2">Clique em &quot;Novo Acórdão&quot; no menu lateral para adicionar.</p>
+            <p className="text-muted-foreground">Nenhuma lista de intimações encontrada.</p>
+            <p className="text-sm text-muted-foreground mt-2">Clique em &quot;Nova Lista&quot; para criar.</p>
           </div>
         </div>
       ) : (
         <>
           <div className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden">
             <div className="relative w-full overflow-x-auto">
-              <Table className="min-w-[800px]">
+              <Table className="min-w-[600px]">
                 <TableHeader>
                   <TableRow className="bg-muted hover:bg-muted border-b">
                     <TableHead className="font-semibold">Número</TableHead>
-                    <TableHead className="font-semibold">Recurso</TableHead>
-                    <TableHead className="font-semibold">Processo</TableHead>
-                    <TableHead className="font-semibold">Publicação</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
+                    <TableHead className="font-semibold">Tipo</TableHead>
+                    <TableHead className="font-semibold">Data</TableHead>
+                    <TableHead className="font-semibold">Qtd. Processos</TableHead>
+                    <TableHead className="font-semibold">Situação</TableHead>
                     <TableHead className="w-[70px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedData.map((decision) => (
-                    <TableRow key={decision.id} className="bg-white hover:bg-muted/40 min-h-[49px]">
+                  {paginatedData.map((list) => (
+                    <TableRow key={list.id} className="bg-white hover:bg-muted/40 min-h-[49px]">
                       <TableCell className="font-medium text-sm">
-                        {decision.decisionNumber}
+                        {list.listNumber}
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm">
-                          {decision.resource.resourceNumber}
+                        <span className="text-sm">{typeLabels[list.type] || list.type}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">
+                          {format(new Date(list.createdAt), 'dd/MM/yyyy', { locale: ptBR })}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm">
-                          {decision.resource.processNumber}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">
-                          {decision.publications.length > 0 ? (
-                            `${decision.publications[0].publicationNumber}, ${format(new Date(decision.publications[0].publicationDate), 'dd/MM/yyyy')}`
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </span>
+                        <span className="text-sm">{list._count.items}</span>
                       </TableCell>
                       <TableCell>
                         <Badge
                           variant="secondary"
                           className={cn(
                             'inline-flex items-center gap-1.5',
-                            statusStyles[decision.status] || 'bg-gray-100 text-gray-800 hover:bg-gray-100'
+                            statusStyles[list.status] || 'bg-gray-100 text-gray-800 hover:bg-gray-100'
                           )}
                         >
-                          {statusIcons[decision.status]}
-                          {statusLabels[decision.status] || decision.status}
+                          {statusIcons[list.status]}
+                          {statusLabels[list.status] || list.status}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -408,44 +365,20 @@ export function DecisionTable({ data, loading, onRefresh, onNewDecision, userRol
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() => router.push(`/ccr/acordaos/${decision.id}`)}
+                              onClick={() => router.push(`/ccr/intimacoes/${list.id}`)}
                               className="cursor-pointer h-9"
                             >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Editar
+                              <Eye className="mr-2 h-4 w-4" />
+                              Visualizar
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleGenerate(decision)}
-                              className="cursor-pointer h-9"
-                            >
-                              {decision.status === 'PENDENTE' ? (
-                                <>
-                                  <FileText className="mr-2 h-4 w-4" />
-                                  Gerar
-                                </>
-                              ) : (
-                                <>
-                                  <Printer className="mr-2 h-4 w-4" />
-                                  Imprimir
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            {decision.status !== 'PENDENTE' && (
+                            {canDelete && list._count.items === 0 && (
                               <DropdownMenuItem
-                                onClick={() => router.push(`/ccr/acordaos/${decision.id}/publicar`)}
+                                onClick={() => handleDelete(list.id)}
+                                disabled={deletingId === list.id}
                                 className="cursor-pointer h-9"
                               >
-                                <Send className="mr-2 h-4 w-4" />
-                                {decision.status === 'PUBLICADO' ? 'Republicar' : 'Ver Publicações'}
-                              </DropdownMenuItem>
-                            )}
-                            {decision.status === 'PENDENTE' && decision._count.publications > 0 && (
-                              <DropdownMenuItem
-                                onClick={() => handleRevert(decision)}
-                                className="cursor-pointer h-9"
-                              >
-                                <Undo2 className="mr-2 h-4 w-4" />
-                                Reverter
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Excluir
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -472,38 +405,17 @@ export function DecisionTable({ data, loading, onRefresh, onNewDecision, userRol
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-md min-w-[4rem]">
-                  <SelectPrimitive.Item
-                    value="10"
-                    className={cn(
-                      "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 h-9"
-                    )}
-                  >
-                    <SelectPrimitive.ItemText>10</SelectPrimitive.ItemText>
-                  </SelectPrimitive.Item>
-                  <SelectPrimitive.Item
-                    value="20"
-                    className={cn(
-                      "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 h-9"
-                    )}
-                  >
-                    <SelectPrimitive.ItemText>20</SelectPrimitive.ItemText>
-                  </SelectPrimitive.Item>
-                  <SelectPrimitive.Item
-                    value="50"
-                    className={cn(
-                      "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 h-9"
-                    )}
-                  >
-                    <SelectPrimitive.ItemText>50</SelectPrimitive.ItemText>
-                  </SelectPrimitive.Item>
-                  <SelectPrimitive.Item
-                    value="100"
-                    className={cn(
-                      "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 h-9"
-                    )}
-                  >
-                    <SelectPrimitive.ItemText>100</SelectPrimitive.ItemText>
-                  </SelectPrimitive.Item>
+                  {[10, 20, 50, 100].map((value) => (
+                    <SelectPrimitive.Item
+                      key={value}
+                      value={value.toString()}
+                      className={cn(
+                        "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 h-9"
+                      )}
+                    >
+                      <SelectPrimitive.ItemText>{value}</SelectPrimitive.ItemText>
+                    </SelectPrimitive.Item>
+                  ))}
                 </SelectContent>
               </Select>
 

@@ -121,7 +121,7 @@ export async function POST(req: Request) {
     const sessionResult = await prismadb.sessionResult.findFirst({
       where: { resourceId },
       include: {
-        session: true,
+        judgedInSession: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -129,7 +129,7 @@ export async function POST(req: Request) {
     });
 
     // Usar o ano do julgamento ou o ano atual
-    const judgmentYear = sessionResult?.session?.year || new Date().getFullYear();
+    const judgmentYear = sessionResult?.judgedInSession?.year || new Date().getFullYear();
 
     // Buscar o último sequenceNumber para o ano do julgamento
     const lastDecision = await prismadb.decision.findFirst({

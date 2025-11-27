@@ -6,5 +6,11 @@
 
 
 
+- ao adicionar tentativa, mostrar os endereços, telefone e emails para selecionar onde será enviado
+- validar se não enviou email/telefone, deve barra enviar ar/carta
+- colocar algo para saber de o contribuinte foi cientificado pessoalmente
+- ao cientificar o cntribuinte pessoalmente, cria uma PLP automática com a ciência dos processos
+- ao criar a PLP para notificar os demais processos, exclui-se o que tomaram ciencia pessoalmente.
 
-- atualização: 26/11/2025 (15:15)
+
+- atualização: 27/11/2025 (15:17)
