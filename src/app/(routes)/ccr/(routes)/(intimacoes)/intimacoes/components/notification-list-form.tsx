@@ -23,6 +23,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type NotificationListFormValues = {
   type: string;
@@ -101,6 +102,30 @@ export function NotificationListForm() {
     }
   };
 
+  if (loadingNumber) {
+    return (
+      <div className="space-y-6">
+        {/* Número da Lista e Tipo da Lista */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </div>
+
+        {/* Botões */}
+        <div className="flex justify-end gap-4">
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-28" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -112,7 +137,7 @@ export function NotificationListForm() {
               Número da Lista
             </label>
             <Input
-              value={loadingNumber ? 'Carregando...' : listNumber}
+              value={listNumber}
               readOnly
               className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0 cursor-default"
             />
@@ -165,7 +190,7 @@ export function NotificationListForm() {
           >
             Cancelar
           </Button>
-          <Button type="submit" disabled={loading || loadingNumber} className="cursor-pointer">
+          <Button type="submit" disabled={loading} className="cursor-pointer">
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Criar Lista
           </Button>

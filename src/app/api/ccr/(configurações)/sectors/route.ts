@@ -28,7 +28,7 @@ export async function GET(req: Request) {
         _count: {
           select: {
             tramitations: true,
-            notifications: true,
+            notificationAttempts: true,
           },
         },
       },
@@ -40,7 +40,7 @@ export async function GET(req: Request) {
     // Adicionar flag isInUse para indicar se o setor está sendo usado
     const sectorsWithFlag = sectors.map(sector => ({
       ...sector,
-      isInUse: sector._count.tramitations > 0 || sector._count.notifications > 0,
+      isInUse: sector._count.tramitations > 0 || sector._count.notificationAttempts > 0,
     }));
 
     return NextResponse.json(sectorsWithFlag);

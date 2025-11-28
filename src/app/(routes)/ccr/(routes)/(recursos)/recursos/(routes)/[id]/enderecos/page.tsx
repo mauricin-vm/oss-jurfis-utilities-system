@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 interface Address {
   id?: string;
   type: string;
+  recipient: string;
   cep: string;
   street: string;
   number: string;
@@ -78,6 +79,7 @@ export default function EnderecosPage() {
           // Garantir que valores null sejam convertidos para string vazia
           const formattedAddresses = addressesData.map((addr: any) => ({
             ...addr,
+            recipient: addr.recipient || '',
             cep: addr.cep || '',
             street: addr.street || '',
             number: addr.number || '',
@@ -117,6 +119,7 @@ export default function EnderecosPage() {
       ...addresses,
       {
         type: 'CORRESPONDENCIA',
+        recipient: '',
         cep: '',
         street: '',
         number: '',
@@ -365,17 +368,21 @@ export default function EnderecosPage() {
 
                   {/* Conteúdo Expandido */}
                   <div className="p-4 space-y-4 border-t">
-                    {/* Linha 1: Tipo, CEP, Rua */}
+                    {/* Linha 1: Tipo, Destinatário, CEP, Rua */}
                     <div className="grid grid-cols-6 gap-4">
                       <div className="space-y-2">
                         <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-10 w-full" />
+                      </div>
+                      <div className="col-span-2 space-y-2">
+                        <Skeleton className="h-4 w-24" />
                         <Skeleton className="h-10 w-full" />
                       </div>
                       <div className="space-y-2">
                         <Skeleton className="h-4 w-12" />
                         <Skeleton className="h-10 w-full" />
                       </div>
-                      <div className="col-span-4 space-y-2">
+                      <div className="col-span-2 space-y-2">
                         <Skeleton className="h-4 w-32" />
                         <Skeleton className="h-10 w-full" />
                       </div>
@@ -526,7 +533,7 @@ export default function EnderecosPage() {
                       {/* Conteúdo do Card - Expansível */}
                       {isExpanded && (
                         <div className="p-4 space-y-4 border-t">
-                          {/* Linha 1: Tipo, CEP, Rua */}
+                          {/* Linha 1: Tipo, Destinatário, CEP, Rua */}
                           <div className="grid grid-cols-6 gap-4">
                             {/* Tipo de Endereço */}
                             <div>
@@ -549,6 +556,23 @@ export default function EnderecosPage() {
                                   ))}
                                 </SelectContent>
                               </Select>
+                            </div>
+
+                            {/* Destinatário */}
+                            <div className="col-span-2">
+                              <label className="block text-sm font-medium mb-1.5 text-gray-700 flex items-center gap-1.5">
+                                Destinatário
+                                <TooltipWrapper content="Nome do responsável pelo endereço que receberá as intimações">
+                                  <HelpCircle className="h-3.5 w-3.5 text-gray-400 cursor-help" />
+                                </TooltipWrapper>
+                              </label>
+                              <Input
+                                placeholder="Nome do destinatário"
+                                value={address.recipient}
+                                onChange={(e) => updateAddress(index, 'recipient', e.target.value)}
+                                disabled={!address.isNew && !address.isActive}
+                                className="h-10 px-3 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 transition-colors focus-visible:ring-0 focus-visible:ring-offset-0"
+                              />
                             </div>
 
                             {/* CEP */}
@@ -579,7 +603,7 @@ export default function EnderecosPage() {
                             </div>
 
                             {/* Rua */}
-                            <div className="col-span-4">
+                            <div className="col-span-2">
                               <label className="block text-sm font-medium mb-1.5 text-gray-700">
                                 Rua/Logradouro <span className="text-red-500">*</span>
                               </label>

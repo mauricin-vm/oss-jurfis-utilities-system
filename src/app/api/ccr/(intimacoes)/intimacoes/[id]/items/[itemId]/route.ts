@@ -46,6 +46,41 @@ export async function GET(
                 name: true,
               },
             },
+            recipients: {
+              include: {
+                contact: {
+                  select: {
+                    id: true,
+                    type: true,
+                    value: true,
+                  },
+                },
+                address: {
+                  select: {
+                    id: true,
+                    type: true,
+                    street: true,
+                    number: true,
+                    city: true,
+                    state: true,
+                  },
+                },
+                part: {
+                  select: {
+                    id: true,
+                    name: true,
+                    role: true,
+                  },
+                },
+              },
+            },
+            sector: {
+              select: {
+                id: true,
+                name: true,
+                abbreviation: true,
+              },
+            },
           },
         },
       },

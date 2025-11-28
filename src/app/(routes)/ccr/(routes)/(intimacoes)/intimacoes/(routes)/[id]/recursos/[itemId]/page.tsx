@@ -212,17 +212,79 @@ export default function DetalhesRecursoIntimacaoPage() {
     return (
       <CCRPageWrapper title="Detalhes do Recurso" breadcrumbs={breadcrumbs}>
         <div className="space-y-6">
+          {/* Card de Informações do Recurso */}
           <Card>
             <CardHeader>
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-4 w-64" />
+              <div className="flex items-center justify-between">
+                <div className="space-y-1.5">
+                  <CardTitle>Informações do Recurso</CardTitle>
+                  <CardDescription>Dados do recurso incluído na lista de intimação.</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-9 w-9" />
+                  <Skeleton className="h-9 w-9" />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="space-y-0">
-                    <Skeleton className="h-4 w-24 mb-1.5" />
-                    <Skeleton className="h-5 w-32" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-0">
+                  <label className="block text-sm font-medium mb-1.5">Número do Processo</label>
+                  <Skeleton className="h-5 w-40" />
+                </div>
+                <div className="space-y-0">
+                  <label className="block text-sm font-medium mb-1.5">Número do Recurso</label>
+                  <Skeleton className="h-5 w-28" />
+                </div>
+                <div className="space-y-0">
+                  <label className="block text-sm font-medium mb-1.5">Status</label>
+                  <Skeleton className="h-6 w-28 rounded-full" />
+                </div>
+                <div className="space-y-0">
+                  <label className="block text-sm font-medium mb-1.5">Lista de Intimação</label>
+                  <Skeleton className="h-5 w-24" />
+                </div>
+                <div className="space-y-0 md:col-span-2">
+                  <label className="block text-sm font-medium mb-1.5">Razão Social</label>
+                  <Skeleton className="h-5 w-48" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card de Tentativas */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1.5">
+                  <CardTitle>Tentativas de Intimação</CardTitle>
+                  <CardDescription>Histórico de tentativas de intimação para este recurso.</CardDescription>
+                </div>
+                <Skeleton className="h-9 w-36" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-4 rounded-lg border bg-gray-50"
+                  >
+                    <div className="flex items-center gap-4">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-4 w-4" />
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-5 w-20 rounded-full" />
+                        </div>
+                        <Skeleton className="h-4 w-48" />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-9 w-20" />
+                      <Skeleton className="h-9 w-9" />
+                    </div>
                   </div>
                 ))}
               </div>

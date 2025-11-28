@@ -196,33 +196,72 @@ export default function VisualizarListaPage() {
 
   if (loading) {
     return (
-      <CCRPageWrapper title="Detalhes da Lista" breadcrumbs={breadcrumbs}>
+      <CCRPageWrapper title={<Skeleton className="h-8 w-64" />} breadcrumbs={breadcrumbs}>
         <div className="space-y-6">
+          {/* Card de Informações da Lista */}
           <Card>
             <CardHeader>
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-4 w-64" />
+              <div className="flex items-center justify-between">
+                <div className="space-y-1.5">
+                  <CardTitle>Informações da Lista</CardTitle>
+                  <CardDescription>Detalhes da lista de intimação.</CardDescription>
+                </div>
+                <Skeleton className="h-9 w-32" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="space-y-0">
-                    <Skeleton className="h-4 w-24 mb-1.5" />
-                    <Skeleton className="h-5 w-32" />
-                  </div>
-                ))}
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Número da Lista</label>
+                  <Skeleton className="h-5 w-24" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Tipo</label>
+                  <Skeleton className="h-5 w-28" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Status</label>
+                  <Skeleton className="h-6 w-24 rounded-full" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Data de Criação</label>
+                  <Skeleton className="h-5 w-40" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1.5">Recursos</label>
+                  <Skeleton className="h-5 w-32" />
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Card de Recursos */}
           <Card>
             <CardHeader>
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-4 w-96" />
+              <div className="flex items-center justify-between">
+                <div className="space-y-1.5">
+                  <CardTitle>Recursos para Intimação</CardTitle>
+                  <CardDescription>Lista de recursos incluídos nesta lista de intimação.</CardDescription>
+                </div>
+                <Skeleton className="h-9 w-40" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-32 w-full" />
+                  <div key={i} className="rounded-lg border p-6 bg-white">
+                    <div className="flex items-start gap-4">
+                      <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <Skeleton className="h-5 w-40" />
+                        <Skeleton className="h-4 w-64" />
+                      </div>
+                      <div className="flex items-start gap-2 flex-shrink-0">
+                        <Skeleton className="h-9 w-24" />
+                        <Skeleton className="h-9 w-9" />
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             </CardContent>

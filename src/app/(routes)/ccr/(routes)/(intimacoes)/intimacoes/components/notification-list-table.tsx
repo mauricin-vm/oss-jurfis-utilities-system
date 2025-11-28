@@ -46,7 +46,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TooltipWrapper } from '@/components/ui/tooltip-wrapper';
-import { Skeleton } from '@/components/ui/skeleton';
+import { NotificationListTableSkeleton } from './notification-list-skeleton';
 
 interface NotificationList {
   id: string;
@@ -110,25 +110,6 @@ const statusIcons: Record<string, React.ReactNode> = {
   PENDENTE: <Clock className="h-3.5 w-3.5" />,
   FINALIZADA: <CheckCircle className="h-3.5 w-3.5" />,
 };
-
-function NotificationListTableSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-end gap-2">
-        <Skeleton className="h-8 w-8" />
-        <Skeleton className="h-8 w-24" />
-        <Skeleton className="h-8 w-28" />
-      </div>
-      <div className="rounded-lg border bg-card">
-        <div className="p-4 space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-12 w-full" />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function NotificationListTable({ data, loading, onRefresh, onNewList, userRole }: NotificationListTableProps) {
   const router = useRouter();

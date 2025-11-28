@@ -86,6 +86,7 @@ export async function PUT(
           where: { id: address.id },
           data: {
             type: address.type,
+            recipient: address.recipient || null,
             cep: address.cep || null,
             street: address.street,
             number: address.number || null,
@@ -102,6 +103,7 @@ export async function PUT(
           data: {
             resourceId: id,
             type: address.type,
+            recipient: address.recipient || null,
             cep: address.cep || null,
             street: address.street,
             number: address.number || null,

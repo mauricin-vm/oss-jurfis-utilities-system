@@ -165,9 +165,10 @@ model Part {
   registrationNumber String? // Número do registro
 
   // Relacionamentos
-  protocols   ProtocolPart[] // Protocolos que usam esta parte
-  contacts    Contact[] // Contatos da parte (telefones/emails)
-  attendances SessionResourceAttendance[] // Presenças em julgamentos
+  protocols                     ProtocolPart[] // Protocolos que usam esta parte
+  contacts                      Contact[] // Contatos da parte (telefones/emails)
+  attendances                   SessionResourceAttendance[] // Presenças em julgamentos
+  notificationAttemptRecipients NotificationAttemptRecipient[] // Tentativas de intimação
 
   // Status
   isActive Boolean @default(true) // Parte ativa (soft delete)
@@ -205,9 +206,9 @@ model Contact {
   partId String
   part   Part   @relation(fields: [partId], references: [id], onDelete: Restrict)
 
-  // Vinculação ao protocolo que criou este contato
-  protocolId String
-  protocol   Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  // Vinculação ao protocolo que criou este contato (opcional)
+  protocolId String?
+  protocol   Protocol? @relation(fields: [protocolId], references: [id], onDelete: Cascade)
 
   // Número do processo (para consultas futuras)
   processNumber String
@@ -226,6 +227,9 @@ model Contact {
   createdByUser User?    @relation("ContactCreatedBy", fields: [createdBy], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  // Relação com tentativas de intimação
+  attemptRecipients NotificationAttemptRecipient[]
 
   @@index([partId])
   @@index([protocolId])
@@ -382,6 +386,7 @@ model Address {
   resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
 
   type         AddressType
+  recipient    String? // Nome do destinatário/responsável pelo endereço
   cep          String?
   street       String // Rua/Logradouro
   number       String? // Número
@@ -395,6 +400,9 @@ model Address {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Relação com tentativas de intimação
+  attemptRecipients NotificationAttemptRecipient[]
 
   @@index([resourceId])
   @@index([type])
@@ -1249,9 +1257,10 @@ model NotificationAttempt {
   channel NotificationChannel
 
   // Informações do envio
-  sentAt   DateTime? // Quando foi enviada (null = ainda não enviada)
-  sentTo   String?   // Para quem (email, telefone, endereço formatado)
-  sentToId String?   // ID do contato ou endereço usado (para referência)
+  sentAt DateTime? // Quando foi enviada (null = ainda não enviada)
+
+  // Destinatários (relacionamento N:N com Contact/Address)
+  recipients NotificationAttemptRecipient[]
 
   // Prazo desta tentativa
   deadline DateTime?
@@ -1266,6 +1275,13 @@ model NotificationAttempt {
 
   observations String? @db.Text
 
+  // Dados específicos para canal SETOR
+  sectorId String?
+  sector   Sector? @relation(fields: [sectorId], references: [id])
+
+  // Dados específicos para canal EXTERNO (campo livre)
+  externalDestination String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1275,6 +1291,33 @@ model NotificationAttempt {
   @@index([deadline])
   @@index([channel])
   @@map("CCR_NotificationAttempt")
+  @@schema("jurfis")
+}
+
+// Relacionamento N:N entre Tentativa e Destinatário (Contact, Address ou Part)
+model NotificationAttemptRecipient {
+  id        String              @id @default(uuid())
+  attemptId String
+  attempt   NotificationAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  // Destinatário pode ser um Contato (EMAIL/WHATSAPP), Endereço (CORREIOS) ou Parte (PESSOALMENTE)
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Restrict)
+  addressId String?
+  address   Address? @relation(fields: [addressId], references: [id], onDelete: Restrict)
+  partId    String?
+  part      Part?    @relation(fields: [partId], references: [id], onDelete: Restrict)
+
+  // Valor do destinatário no momento do envio (snapshot)
+  recipientValue String // Email, telefone, endereço formatado ou nome da parte
+
+  createdAt DateTime @default(now())
+
+  @@index([attemptId])
+  @@index([contactId])
+  @@index([addressId])
+  @@index([partId])
+  @@map("CCR_NotificationAttemptRecipient")
   @@schema("jurfis")
 }
 
@@ -1290,6 +1333,8 @@ enum NotificationChannel {
   WHATSAPP
   CORREIOS
   PESSOALMENTE
+  SETOR
+  EXTERNO
   EDITAL
 
   @@schema("jurfis")
@@ -1474,7 +1519,8 @@ model Sector {
   isActive Boolean @default(true)
 
   // Relacionamentos
-  tramitations Tramitation[]
+  tramitations         Tramitation[]
+  notificationAttempts NotificationAttempt[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
